@@ -151,22 +151,22 @@ export default function Editlocation() {
                         <Label>Latitude</Label>
                         <Input
                             type="text"
+                            placeholder="e.g. 16.840900"
                             value={location.latitude}
                             onChange={(e) =>
                                 setLocation({ ...location, latitude: e.target.value })
                             }
-                            readOnly
                         />
                     </div>
                     <div className="md:col-span-1">
                         <Label>Longitude</Label>
                         <Input
                             type="text"
+                            placeholder="e.g. 96.173500"
                             value={location.longitude}
                             onChange={(e) =>
                                 setLocation({ ...location, longitude: e.target.value })
                             }
-                            readOnly
                         />
                     </div>
                     <div className="md:col-span-2 flex items-end">
@@ -254,6 +254,8 @@ export default function Editlocation() {
             </ComponentCard>
             {showMap && (
                 <LocationModal
+                    initialLat={location.latitude}
+                    initialLng={location.longitude}
                     onClose={() => setShowMap(false)}
                     onSelect={(position) => {
                         setLocation(prev => ({

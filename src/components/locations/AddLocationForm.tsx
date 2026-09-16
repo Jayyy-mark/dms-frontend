@@ -463,11 +463,10 @@ export default function AddLocationForm() {
                 <Input
                   name="latitude"
                   id="latitude"
-                  placeholder={t("Selected via map") || ""}
+                  placeholder={t("e.g. 16.840900") || "16.840900"}
                   value={form.latitude}
                   onChange={(e) => handleChange("latitude", e.target.value)}
-                  readOnly
-                  className="bg-gray-100 text-gray-700 cursor-not-allowed border-gray-200"
+                  className="bg-white border-gray-200"
                 />
               </div>
 
@@ -476,11 +475,10 @@ export default function AddLocationForm() {
                 <Input
                   name="longitude"
                   id="longitude"
-                  placeholder={t("Selected via map") || ""}
+                  placeholder={t("e.g. 96.173500") || "96.173500"}
                   value={form.longitude}
                   onChange={(e) => handleChange("longitude", e.target.value)}
-                  readOnly
-                  className="bg-gray-100 text-gray-700 cursor-not-allowed border-gray-200"
+                  className="bg-white border-gray-200"
                 />
               </div>
 
@@ -543,6 +541,8 @@ export default function AddLocationForm() {
       {/* Interactive Map Selector Modal */}
       {showMap && (
         <LocationModal
+          initialLat={form.latitude}
+          initialLng={form.longitude}
           onClose={() => setShowMap(false)}
           onSelect={(position) => {
             setForm((prev) => ({

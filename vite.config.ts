@@ -8,7 +8,7 @@ export default defineConfig({
   plugins: [
     react(),
     mkcert({
-      hosts: ['localhost', '192.168.20.39', '10.41.250.196']
+      hosts: ['localhost', '192.168.0.100']
     }),
     svgr({
       svgrOptions: {
@@ -20,7 +20,7 @@ export default defineConfig({
     }),
   ],
   server: {
-    host: '10.41.250.196',
+    host: '192.168.0.100',
     port: 5173,
   }
 });
