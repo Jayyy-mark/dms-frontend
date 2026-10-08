@@ -20,13 +20,37 @@ export const documentApi = {
         return res.data;
     },
     async update(data: UpdateDocument): Promise<any> {
-        const res = await api.put(`document/update/${data.id}/`, {
-            document_id: data.document_id,
-            document_name: data.document_name,
-            staff_id: data.staff_id,
-            category_id: data.category_id,
-            dtype: data.dtype_id,
-            description: data.description,
+        let payload: any;
+        const isFile = data.document instanceof File;
+
+        if (isFile) {
+            const formData = new FormData();
+            formData.append("document_id", data.document_id);
+            formData.append("document_name", data.document_name);
+            formData.append("staff_id", String(data.staff_id));
+            formData.append("category_id", String(data.category_id));
+            formData.append("dtype_id", String(data.dtype_id));
+            formData.append("description", data.description || "");
+            if (data.expired_at) {
+                formData.append("expired_at", String(data.expired_at));
+            }
+            formData.append("document", data.document as File);
+            payload = formData;
+        } else {
+            payload = {
+                document_id: data.document_id,
+                document_name: data.document_name,
+                staff_id: data.staff_id,
+                category_id: data.category_id,
+                dtype_id: data.dtype_id,
+                dtype: data.dtype_id,
+                description: data.description,
+                expired_at: data.expired_at || null,
+            };
+        }
+
+        const res = await api.put(`document/update/${data.id}/`, payload, {
+            headers: isFile ? { "Content-Type": "multipart/form-data" } : undefined,
         });
         return res.data;
     },

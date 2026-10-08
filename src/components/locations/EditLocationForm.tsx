@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
+import { X } from "lucide-react";
 import ComponentCard from "../common/ComponentCard.tsx";
 import { useNavigate, useParams } from "react-router";
 import { UpdateLocation } from "../../interfaces/location.ts";
@@ -77,10 +78,45 @@ export default function Editlocation() {
         fetchOptions();
     }, []);
 
-    const locationTypeOptions = locationOptions?.location_types.map(type => ({
-        value: type,
-        label: type
-    })) || [];
+    const [customTypeOptions, setCustomTypeOptions] = useState<string[]>([]);
+    const [typeInputValue, setTypeInputValue] = useState("");
+    const [isManualTypeInput, setIsManualTypeInput] = useState(false);
+
+    const locationTypeOptions = useMemo(() => {
+        const fromApi = locationOptions?.location_types || [];
+        const combined = Array.from(
+            new Set(
+                [...fromApi, ...customTypeOptions, location.location_type]
+                    .map((s) => (typeof s === "string" ? s.trim() : ""))
+                    .filter(Boolean)
+            )
+        );
+        return combined.map((type) => ({
+            value: type,
+            label: type,
+        }));
+    }, [locationOptions, customTypeOptions, location.location_type]);
+
+    const handleSelectOrCreateType = (inputValue: string) => {
+        const trimmed = inputValue.trim();
+        if (!trimmed) {
+            handleChange("location_type", "");
+            return;
+        }
+
+        // Check if an existing option matches (case-insensitive)
+        const existing = locationTypeOptions.find(
+            (opt) => opt.value.trim().toLowerCase() === trimmed.toLowerCase()
+        );
+
+        if (existing) {
+            handleChange("location_type", existing.value);
+        } else {
+            setCustomTypeOptions((prev) => Array.from(new Set([...prev, trimmed])));
+            handleChange("location_type", trimmed);
+            toast.info(`New activity type added: "${trimmed}"`);
+        }
+    };
 
     const handleChange = (field: string, value: string) => {
         setLocation(prev => ({
@@ -90,6 +126,7 @@ export default function Editlocation() {
     };
 
     const handleSubmit = async () => {
+
         const valid = validate([
             { field: "location_name", value: location.location_name, label: "Location name", required: true },
             { field: "city", value: location.city, label: "City", required: true },
@@ -97,8 +134,10 @@ export default function Editlocation() {
             { field: "location_type", value: location.location_type, label: "Location type", required: true },
             { field: "department_id", value: location.department_id, label: "Department", required: true },
         ]);
+        console.log("this is the location : ", location)
+        console.log("this is the validation result", valid)
         if (!valid) return;
-
+        console.log("function entered!");
         try {
             const data = await locationApi.update(location);
             toast.success(data.message || "Updated successfully!");
@@ -193,17 +232,109 @@ export default function Editlocation() {
                         />
                     </div>
                     <div className="md:col-span-2">
-                        <Label>Location Type : </Label>
-                        <CreatableSelect
-                            isClearable
-                            options={locationTypeOptions}
-                            value={locationTypeOptions.find(o => o.value === location.location_type) || (location.location_type ? { value: location.location_type, label: location.location_type } : null)}
-                            onChange={(option) => {
-                                handleChange("location_type", option?.value || "");
-                            }}
-                            placeholder={locationTypeOptions.length === 0 ? "No data available" : "Select or type..."}
-                            formatCreateLabel={(inputValue) => `Create "${inputValue}"`}
-                        />
+                        <div className="flex items-center justify-between mb-1.5">
+                            <Label className="mb-0">Location / Activity Type : </Label>
+                            <div className="flex items-center gap-2">
+                                {location.location_type && (
+                                    <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                                        {locationOptions?.location_types?.includes(location.location_type)
+                                            ? "Existing type"
+                                            : "New type"}
+                                    </span>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsManualTypeInput(!isManualTypeInput);
+                                        setTypeInputValue("");
+                                    }}
+                                    className="text-xs font-semibold text-[#B88E2F] hover:text-amber-700 hover:underline transition-colors flex items-center gap-1"
+                                >
+                                    {isManualTypeInput ? "← Select from list" : "+ Type custom directly"}
+                                </button>
+                            </div>
+                        </div>
+
+                        {isManualTypeInput ? (
+                            <div className="relative">
+                                <Input
+                                    name="location_type"
+                                    placeholder="Type custom activity type..."
+                                    value={location.location_type}
+                                    onChange={(e) => handleSelectOrCreateType(e.target.value)}
+                                    className="bg-white border-gray-200 pr-10"
+                                    autoFocus
+                                />
+                                {location.location_type && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleChange("location_type", "")}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
+                                        title="Clear"
+                                    >
+                                        <X size={15} />
+                                    </button>
+                                )}
+                            </div>
+                        ) : (
+                            <CreatableSelect
+                                isClearable
+                                isSearchable
+                                createOptionPosition="first"
+                                options={locationTypeOptions}
+                                value={
+                                    locationTypeOptions.find(o => o.value === location.location_type) ||
+                                    (location.location_type ? { value: location.location_type, label: location.location_type } : null)
+                                }
+                                inputValue={typeInputValue}
+                                onInputChange={(newInput, actionMeta) => {
+                                    if (actionMeta.action === "input-change") {
+                                        setTypeInputValue(newInput);
+                                    } else if (actionMeta.action === "set-value" || actionMeta.action === "menu-close") {
+                                        setTypeInputValue("");
+                                    }
+                                }}
+                                onChange={(option) => {
+                                    if (option) {
+                                        handleSelectOrCreateType(option.value);
+                                    } else {
+                                        handleChange("location_type", "");
+                                    }
+                                    setTypeInputValue("");
+                                }}
+                                onCreateOption={(newOption) => {
+                                    handleSelectOrCreateType(newOption);
+                                    setTypeInputValue("");
+                                }}
+                                onBlur={() => {
+                                    if (typeInputValue.trim()) {
+                                        handleSelectOrCreateType(typeInputValue.trim());
+                                        setTypeInputValue("");
+                                    }
+                                }}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter" && typeInputValue.trim()) {
+                                        e.preventDefault();
+                                        handleSelectOrCreateType(typeInputValue.trim());
+                                        setTypeInputValue("");
+                                    }
+                                }}
+                                isValidNewOption={(inputValue, _selectValue, selectOptions) => {
+                                    const trimmed = inputValue?.trim();
+                                    if (!trimmed) return false;
+                                    return !selectOptions.some(
+                                        (opt) => opt.label.trim().toLowerCase() === trimmed.toLowerCase()
+                                    );
+                                }}
+                                placeholder={locationTypeOptions.length === 0 ? "No data available" : "Select or type..."}
+                                formatCreateLabel={(inputValue) => `+ Create new "${inputValue}"`}
+                                noOptionsMessage={({ inputValue }) =>
+                                    inputValue?.trim()
+                                        ? `Press Enter or click to create "${inputValue}"`
+                                        : "No options. Type to create new..."
+                                }
+                            />
+                        )}
                         <FieldError message={errors.location_type} />
                     </div>
                     <div className="md:col-span-2">
@@ -261,7 +392,9 @@ export default function Editlocation() {
                         setLocation(prev => ({
                             ...prev,
                             latitude: position.lat,
-                            longitude: position.lng
+                            longitude: position.lng,
+                            city: position.city || prev.city,
+                            state_division: position.state_division || prev.state_division
                         }));
                         setShowMap(false);
                     }}

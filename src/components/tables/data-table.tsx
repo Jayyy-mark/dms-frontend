@@ -26,6 +26,7 @@ type DataTableProps<T extends { id: number }> = {
   tableTitle?: string;
   headerActions?: React.ReactNode;
   renderDetailPanel?: (row: T, onClose: () => void) => React.ReactNode;
+  onExportPDF?: (currentFilter?: string) => void;
 };
 
 export function DataTable<T extends { id: number }>({
@@ -35,6 +36,7 @@ export function DataTable<T extends { id: number }>({
   tableTitle,
   headerActions,
   renderDetailPanel,
+  onExportPDF,
 }: DataTableProps<T>) {
     const { t } = useTranslation();
     const [globalFilter, setGlobalFilter] = useState("");
@@ -49,38 +51,20 @@ export function DataTable<T extends { id: number }>({
 
         onGlobalFilterChange: setGlobalFilter,
 
-        globalFilterFn: (row, value) => {
-            const search = String(value)
+        globalFilterFn: (row, columnId, filterValue) => {
+            const search = String(filterValue ?? "")
                 .toLowerCase()
+                .trim()
                 .normalize("NFKC");
 
-            const flatten = (obj : unknown):string => {
-                if (obj == null) return "";
+            if (!search) return true;
 
-                if (typeof obj === "string" || typeof obj === "number") {
-                    return String(obj);
-                }
-
-                if (obj instanceof Date) {
-                    return obj.toISOString();
-                }
-
-                if (Array.isArray(obj)) {
-                    return obj.map(flatten).join(" ");
-                }
-
-                if (typeof obj === "object") {
-                    return Object.values(obj).map(flatten).join(" ");
-                }
-
-                return "";
-            };
-
-            const dataString = flatten(row.original)
-                .toLowerCase()
-                .normalize("NFKC");
-
-            return dataString.includes(search);
+            const value = row.getValue(columnId);
+            if (value != null) {
+                const str = String(value).toLowerCase().normalize("NFKC");
+                return str.includes(search);
+            }
+            return false;
         },
         onRowSelectionChange: setRowSelection,
         enableRowSelection: true,
@@ -93,7 +77,12 @@ export function DataTable<T extends { id: number }>({
         .getFilteredRowModel()
         .rows.map((row) => row.original);
 
-    const exportPDF = () => {
+    const handleExportPDF = () => {
+        if (onExportPDF) {
+            onExportPDF(globalFilter);
+            return;
+        }
+
         const doc = new jsPDF();
 
         autoTable(doc, {
@@ -205,7 +194,7 @@ export function DataTable<T extends { id: number }>({
                         
                         {/* Export Buttons */}
                         <div className="flex items-center bg-gray-50 rounded-lg p-1 border border-gray-200 gap-1">
-                            <button onClick={exportPDF} className="p-1 rounded transition-colors text-gray-400 hover:text-red-500 hover:bg-white shadow-sm" title="Export PDF">
+                            <button onClick={handleExportPDF} className="p-1 rounded transition-colors text-gray-400 hover:text-red-500 hover:bg-white shadow-sm" title="Export PDF">
                                 <FileText size={15} />
                             </button>
                             <button onClick={exportExcel} className="p-1 rounded transition-colors text-gray-400 hover:text-green-600 hover:bg-white shadow-sm" title="Export Excel">

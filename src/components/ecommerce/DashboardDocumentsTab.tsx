@@ -14,6 +14,8 @@ import { Document } from "../../interfaces/document";
 import { Category } from "../../interfaces/category";
 import { Department } from "../../interfaces/department";
 import { Staff } from "../../interfaces/staff";
+import { API_SERVER } from "../../helpers/api";
+import { toast } from "react-toastify";
 
 /* ── helpers ── */
 function fmtDate(d?: string) {
@@ -129,6 +131,29 @@ export default function DashboardDocumentsTab() {
   };
 
   const hasActiveFilter = filterStaff || filterDept || filterCategory;
+
+  const getDocUrl = (docField?: any): string => {
+    if (!docField) return "";
+    const str = typeof docField === "string" ? docField : docField?.url || String(docField);
+    if (str.startsWith("http://") || str.startsWith("https://")) return str;
+    const base = (API_SERVER || "").replace(/\/$/, "");
+    const cleanPath = str.startsWith("/") ? str : `/${str}`;
+    return `${base}${cleanPath}`;
+  };
+
+  const handleViewDocument = (doc: Document) => {
+    const rawDoc = doc.document || (doc as any).file_url || (doc as any).file;
+    if (!rawDoc) {
+      toast.info(t("No document file attached."));
+      return;
+    }
+    const fullUrl = getDocUrl(rawDoc);
+    if (!fullUrl) {
+      toast.info(t("Invalid document URL."));
+      return;
+    }
+    window.open(fullUrl, "_blank", "noopener,noreferrer");
+  };
 
   /* ── render ── */
   return (
@@ -392,7 +417,13 @@ export default function DashboardDocumentsTab() {
                         </span>
                       </td>
                       <td className="max-w-[180px] px-5 py-3.5">
-                        <p className="truncate text-sm font-semibold text-gray-800 dark:text-white/90">{doc.document_name}</p>
+                        <p
+                          onClick={() => handleViewDocument(doc)}
+                          className="truncate text-sm font-semibold text-gray-800 hover:text-teal-600 transition-colors cursor-pointer dark:text-white/90"
+                          title={doc.document_name}
+                        >
+                          {doc.document_name}
+                        </p>
                         {doc.description && (
                           <p className="mt-0.5 truncate text-[11px] text-gray-400">{doc.description}</p>
                         )}
@@ -422,9 +453,16 @@ export default function DashboardDocumentsTab() {
                         </div>
                       </td>
                       <td className="px-5 py-3.5 text-xs text-gray-400">{fmtDate(doc.created_at)}</td>
-                      <td className="px-5 py-3.5">
-                        <button className="flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-[11px] font-semibold text-gray-500 opacity-0 transition hover:border-teal-300 hover:bg-teal-50 hover:text-teal-600 group-hover:opacity-100 dark:border-gray-700">
-                          <Eye className="h-3.5 w-3.5" /> {t("View")}
+                      <td className="px-5 py-3.5 text-right whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewDocument(doc);
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-teal-200 bg-teal-50/70 px-2.5 py-1.5 text-[11px] font-semibold text-teal-700 transition hover:border-teal-400 hover:bg-teal-100 hover:text-teal-800 dark:border-teal-800 dark:bg-teal-950/40 dark:text-teal-300 shadow-2xs"
+                        >
+                          <Eye className="h-3.5 w-3.5 text-teal-600" /> {t("View")}
                         </button>
                       </td>
                     </tr>
@@ -440,13 +478,27 @@ export default function DashboardDocumentsTab() {
               {filtered.map(doc => (
                 <div
                   key={doc.id}
-                  className="group relative flex flex-col gap-3 rounded-xl border border-gray-100 bg-gray-50/50 p-5 transition-all hover:border-teal-200 hover:bg-white hover:shadow-sm dark:border-gray-700 dark:bg-gray-800/50 dark:hover:bg-gray-800"
+                  onClick={() => handleViewDocument(doc)}
+                  className="group relative flex flex-col gap-3 rounded-xl border border-gray-100 bg-gray-50/50 p-5 transition-all hover:border-teal-200 hover:bg-white hover:shadow-sm dark:border-gray-700 dark:bg-gray-800/50 dark:hover:bg-gray-800 cursor-pointer"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-50 dark:bg-teal-500/10">
                       <FileText className="h-5 w-5 text-teal-500" />
                     </div>
-                    {dtypeBadge(doc.dtype?.dtype_name)}
+                    <div className="flex items-center gap-2">
+                      {dtypeBadge(doc.dtype?.dtype_name)}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewDocument(doc);
+                        }}
+                        className="flex h-7 w-7 items-center justify-center rounded-lg border border-teal-200 bg-teal-50 text-teal-600 transition hover:bg-teal-100 hover:text-teal-700 dark:border-teal-800 dark:bg-teal-950/40"
+                        title={t("View")}
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
 
                   <div>

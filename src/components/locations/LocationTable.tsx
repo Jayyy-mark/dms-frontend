@@ -48,7 +48,24 @@ export default function LocationTable({
 
   const handleEditlocation = async (location: Location) => {
     navigate(`/locations/edit/${location.id}`);
-  }
+  };
+
+  const handleExportPDF = async (search?: string) => {
+    try {
+      toast.info("Generating PDF report...");
+      const blob = await locationApi.exportPdf(search);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "locations.pdf";
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast.success("PDF exported successfully!");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to export PDF");
+    }
+  };
 
   return (
     <>
@@ -56,6 +73,7 @@ export default function LocationTable({
         <DataTable
           data={locations}
           columns={LocationColumns(handleEditlocation, handleDeleteClick)}
+          onExportPDF={handleExportPDF}
           renderDetailPanel={(location, onClose) => (
             <LocationDetailDrawer location={location} onClose={onClose} />
           )}

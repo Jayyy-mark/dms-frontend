@@ -71,7 +71,7 @@ export default function Locations() {
   const recentLocations = useMemo(() => {
     return [...locations].sort((a: Location, b: Location) => {
       return new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime();
-    }).slice(0, 10);
+    });
   }, [locations]);
 
   const handleSearch = async (data: LocationSearch) => {

@@ -27,12 +27,14 @@ export const LocationColumns = (
   {
     id: "sl",
     header: "SL",
+    enableGlobalFilter: false,
     cell: ({ row }) => <span className="text-sm font-semibold text-gray-700">{row.index + 1}</span>,
     size: 50,
   },
   {
     id: "icon",
     header: "Icon",
+    enableGlobalFilter: false,
     cell: ({ row }) => {
       const photoUrl = row.original.photo ? `${API_SERVER}${row.original.photo}` : "";
       return photoUrl ? (
@@ -52,6 +54,7 @@ export const LocationColumns = (
   {
     accessorKey: "location_name",
     header: "File Name",
+    enableGlobalFilter: true,
     cell: ({ row }) => (
       <span className="text-sm text-gray-700 font-medium">
         {row.original.location_name || "Unknown"}
@@ -61,24 +64,29 @@ export const LocationColumns = (
   {
     id: "file_type",
     header: "File Type",
-    cell: ({ row }) => {
-      let ext = "image";
-      const photoStr = row.original.photo as any as string;
+    accessorFn: (row) => {
+      if (row.file_type) return row.file_type;
+      const photoStr = row.photo as any as string;
       if (photoStr && typeof photoStr === 'string') {
         const parts = photoStr.split(".");
-        if (parts.length > 1) ext = parts.pop() || "image";
+        if (parts.length > 1) return parts[parts.length - 1].toLowerCase();
       }
-      return <span className="text-sm text-gray-600">{ext}</span>;
+      return "image";
     },
+    enableGlobalFilter: true,
+    cell: ({ getValue }) => <span className="text-sm text-gray-600">{getValue() as string}</span>,
   },
   {
-    id: "file_size",
-    header: "File Size",
-    cell: () => <span className="text-sm text-gray-600">N/A</span>,
+    id: "department",
+    header: "Department",
+    accessorFn: (row) => row.department_name || row.department?.department_name || "—",
+    enableGlobalFilter: true,
+    cell: ({ getValue }) => <span className="text-sm text-gray-600">{getValue() as string}</span>,
   },
   {
     id: "uploaded",
     header: "Uploaded",
+    enableGlobalFilter: false,
     cell: ({ row }) => (
       <span className="text-sm text-gray-600">
         {timeAgo(row.original.date)}
@@ -88,6 +96,7 @@ export const LocationColumns = (
   {
     id: "actions",
     header: "Action",
+    enableGlobalFilter: false,
     size: 100,
     cell: ({ row }) => {
       const handleDownload = () => {

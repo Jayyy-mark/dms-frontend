@@ -70,6 +70,8 @@ export interface UpdateDocument {
     dtype_id: string;
 
     description: string;
+    expired_at?: string | Date | null;
+    document?: File | string | null;
 }
 
 export interface DeepSearchDocument {

@@ -18,6 +18,9 @@ export interface Location {
     description: string;
     location_type: string;
     department_id: string;
+    department?: any;
+    department_name?: string;
+    file_type?: string;
 }
 
 export interface AddLocation {

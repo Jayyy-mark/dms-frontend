@@ -56,4 +56,11 @@ export const locationApi = {
         const res = await api.get("location/options/");
         return res.data;
     },
+    async exportPdf(search?: string): Promise<Blob> {
+        const res = await api.get("location/export-pdf/", {
+            params: search ? { search } : undefined,
+            responseType: "blob",
+        });
+        return res.data;
+    },
 }

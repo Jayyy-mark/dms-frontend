@@ -3,10 +3,20 @@ import { X, MapPin, Navigation, Globe, Check, HardDrive } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import {
+  reverseGeocodeOffline,
+  reverseGeocode,
+  MyanmarLocationInfo,
+} from "../../helpers/myanmarGeocoding";
 
 interface LocationModalProps {
   onClose: () => void;
-  onSelect: (position: { lat: string; lng: string }) => void;
+  onSelect: (position: {
+    lat: string;
+    lng: string;
+    city: string;
+    state_division: string;
+  }) => void;
   initialLat?: string | number;
   initialLng?: string | number;
 }
@@ -91,6 +101,39 @@ export default function LocationModal({
   const [markerPos, setMarkerPos] = useState<{ lat: number; lng: number } | null>(
     initLatNum !== null && initLngNum !== null ? { lat: initLatNum, lng: initLngNum } : null
   );
+
+  const [detectedLocation, setDetectedLocation] = useState<MyanmarLocationInfo | null>(() => {
+    if (initLatNum !== null && initLngNum !== null) {
+      return reverseGeocodeOffline(initLatNum, initLngNum);
+    }
+    return null;
+  });
+
+  // Automatically geocode coordinates whenever marker changes
+  useEffect(() => {
+    if (!markerPos) {
+      setDetectedLocation(null);
+      return;
+    }
+
+    // 1. Instant 100% offline lookup
+    const offlineInfo = reverseGeocodeOffline(markerPos.lat, markerPos.lng);
+    setDetectedLocation(offlineInfo);
+
+    // 2. Non-blocking enhancement if online
+    let cancelled = false;
+    reverseGeocode(markerPos.lat, markerPos.lng)
+      .then((res) => {
+        if (!cancelled && res) {
+          setDetectedLocation(res);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [markerPos?.lat, markerPos?.lng]);
 
   // Manual inputs for direct typing/pasting
   const [inputLat, setInputLat] = useState<string>(
@@ -325,14 +368,22 @@ export default function LocationModal({
 
         {/* Footer */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-6 py-4 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/40">
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="text-gray-500 dark:text-gray-400 font-medium">
               {t("Selected GPS")}:
             </span>
             {markerPos ? (
-              <span className="font-mono font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1 rounded-lg border border-blue-100 dark:border-blue-900">
-                {formatCoord(markerPos.lat)}, {formatCoord(markerPos.lng)}
-              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-mono font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1 rounded-lg border border-blue-100 dark:border-blue-900">
+                  {formatCoord(markerPos.lat)}, {formatCoord(markerPos.lng)}
+                </span>
+                {detectedLocation && (
+                  <span className="font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800 flex items-center gap-1.5 shadow-xs">
+                    <MapPin size={13} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <span>{detectedLocation.city}, {detectedLocation.state_division}</span>
+                  </span>
+                )}
+              </div>
             ) : (
               <span className="text-gray-400 italic">
                 {t("Click anywhere on the map to place a pin")}
@@ -354,9 +405,13 @@ export default function LocationModal({
               disabled={!markerPos}
               onClick={() => {
                 if (!markerPos) return;
+                const locInfo =
+                  detectedLocation || reverseGeocodeOffline(markerPos.lat, markerPos.lng);
                 onSelect({
                   lat: formatCoord(markerPos.lat),
                   lng: formatCoord(markerPos.lng),
+                  city: locInfo.city,
+                  state_division: locInfo.state_division,
                 });
                 onClose();
               }}

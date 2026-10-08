@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from "react";
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
-import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { Document as DocxDocument, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle } from 'docx';
 import { Log } from "../../interfaces/log";
 import { helper } from "../../helpers/utils";
 import { useLogs } from "../../hooks/useLogs";
+import { auditLogApi } from "../../api/auditLogApi";
+import { toast } from "react-toastify";
 import {
     MoreVertical,
     User,
@@ -147,30 +148,20 @@ export default function LogTable({ logs: propLogs, isLoading: propIsLoading }: L
         setIsExportMenuOpen(false);
     };
 
-    const exportToPdf = () => {
-        const doc = new jsPDF();
-        const data = getExportData();
-
-        doc.text("System Audit Logs", 14, 15);
-
-        const tableColumn = ["Log ID", "User", "Role", "Event", "Resource", "Date"];
-        const tableRows = data.map(row => [
-            row["Log ID"],
-            row.User,
-            row.Role,
-            row.Event,
-            row.Resource,
-            row.Date
-        ]);
-
-        (doc as any).autoTable({
-            head: [tableColumn],
-            body: tableRows,
-            startY: 20,
-        });
-
-        doc.save("system_logs.pdf");
-        setIsExportMenuOpen(false);
+    const exportToPdf = async () => {
+        try {
+            toast.info("Generating logs PDF report...");
+            setIsExportMenuOpen(false);
+            const blob = await auditLogApi.exportPdf({
+                date: selectedDate,
+                action: selectedAction,
+                role: selectedRole,
+            });
+            saveAs(blob, "system_logs.pdf");
+            toast.success("Logs PDF exported successfully!");
+        } catch (err: any) {
+            toast.error(err?.message || "Failed to export PDF");
+        }
     };
 
     const exportToDocx = async () => {
@@ -405,12 +396,11 @@ export default function LogTable({ logs: propLogs, isLoading: propIsLoading }: L
                                                 {helper.formatStrDate(log.created_at)}
                                             </span>
                                             <div className="mt-1">
-                                                <span className={`inline-flex items-center text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
-                                                    log.action?.toUpperCase() === 'DELETE' ? 'text-red-600 bg-red-50' :
+                                                <span className={`inline-flex items-center text-[10px] font-extrabold px-2 py-0.5 rounded-full ${log.action?.toUpperCase() === 'DELETE' ? 'text-red-600 bg-red-50' :
                                                     log.action?.toUpperCase() === 'UPDATE' ? 'text-[#997524] bg-[#FEF3C7]' :
-                                                    log.action?.toUpperCase() === 'CREATE' ? 'text-emerald-600 bg-emerald-50' :
-                                                    'text-amber-600 bg-amber-50'
-                                                }`}>
+                                                        log.action?.toUpperCase() === 'CREATE' ? 'text-emerald-600 bg-emerald-50' :
+                                                            'text-amber-600 bg-amber-50'
+                                                    }`}>
                                                     {log.action?.toUpperCase() || 'UNKNOWN'}
                                                 </span>
                                             </div>

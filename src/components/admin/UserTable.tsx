@@ -19,6 +19,8 @@ import {
     Mail,
     Calendar,
     X,
+    Ban,
+    CheckCircle,
 } from "lucide-react";
 
 export default function UserTable({
@@ -32,6 +34,9 @@ export default function UserTable({
 
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
+
+    const [banModalOpen, setBanModalOpen] = useState(false);
+    const [banTarget, setBanTarget] = useState<User | null>(null);
 
     // UI States
     const [openDropdownId, setOpenDropdownId] = useState<number | null>(null);
@@ -109,6 +114,44 @@ export default function UserTable({
         }
     };
 
+    // Ban / Unban single user
+    const handleBanToggleClick = (user: User) => {
+        setBanTarget(user);
+        setBanModalOpen(true);
+        setOpenDropdownId(null);
+    };
+
+    const confirmBanToggle = async () => {
+        if (!banTarget) return;
+        const newStatus = banTarget.is_active === false;
+        try {
+            await userApi.toggleBan(banTarget.id, newStatus);
+            const actionText = newStatus ? "unbanned" : "banned";
+            toast.success(`User "${banTarget.username}" ${actionText} successfully`);
+            setUsers(prev => prev.map(u => u.id === banTarget.id ? { ...u, is_active: newStatus } : u));
+            if (detailUser && detailUser.id === banTarget.id) {
+                setDetailUser(prev => prev ? { ...prev, is_active: newStatus } : null);
+            }
+            setBanModalOpen(false);
+            setBanTarget(null);
+        } catch (err: any) {
+            toast.error(err?.message || "Failed to update user status!");
+        }
+    };
+
+    // Bulk Ban / Unban
+    const handleBulkBan = async (status: boolean) => {
+        try {
+            await Promise.all([...selectedIds].map(id => userApi.toggleBan(id, status)));
+            const actionText = status ? "unbanned" : "banned";
+            toast.success(`${selectedIds.size} user(s) ${actionText} successfully.`);
+            setUsers(prev => prev.map(u => selectedIds.has(u.id) ? { ...u, is_active: status } : u));
+            setSelectedIds(new Set());
+        } catch (err: any) {
+            toast.error(err?.message || "Bulk status update failed!");
+        }
+    };
+
     const toggleSelectAll = () => {
         setSelectedIds(prev => {
             const next = new Set(prev);
@@ -142,17 +185,21 @@ export default function UserTable({
 
     const getRoleBadge = (role: string) => {
         const r = role?.toLowerCase();
-        if (r === 'admin') return 'bg-[#eff6ff] text-[#3b82f6]';
-        if (r === 'staff') return 'bg-[#f0fdf4] text-[#22c55e]';
+        if (r === 'super admin' || r === 'super_admin') return 'bg-[#faf5ff] text-[#9333ea] border border-[#f3e8ff]';
+        if (r === 'admin') return 'bg-[#eff6ff] text-[#3b82f6] border border-[#dbeafe]';
+        if (r === 'user') return 'bg-[#f8fafc] text-[#64748b] border border-[#e2e8f0]';
         return 'bg-gray-100 text-gray-600';
     };
 
     // Filter Logic
     const filteredUsers = users.filter(user => {
+        const role = user.role?.toLowerCase();
         // Tab filter
-        if (activeTab === 'admin' && user.role?.toLowerCase() !== 'admin') return false;
-        if (activeTab === 'staff' && user.role?.toLowerCase() !== 'staff') return false;
+        if (activeTab === 'super admin' && role !== 'super admin' && role !== 'super_admin') return false;
+        if (activeTab === 'admin' && role !== 'admin') return false;
+        if (activeTab === 'user' && role !== 'user') return false;
         if (activeTab === 'active' && user.is_active === false) return false;
+        if (activeTab === 'banned' && user.is_active !== false) return false;
 
         // Search filter
         if (searchQuery) {
@@ -172,9 +219,14 @@ export default function UserTable({
     // Stats for tabs
     const stats = {
         all: users.length,
+        superAdmin: users.filter(u => {
+            const r = u.role?.toLowerCase();
+            return r === 'super admin' || r === 'super_admin';
+        }).length,
         admin: users.filter(u => u.role?.toLowerCase() === 'admin').length,
-        staff: users.filter(u => u.role?.toLowerCase() === 'staff').length,
+        user: users.filter(u => u.role?.toLowerCase() === 'user').length,
         active: users.filter(u => u.is_active !== false).length,
+        banned: users.filter(u => u.is_active === false).length,
     };
 
     // Pagination logic
@@ -222,6 +274,13 @@ export default function UserTable({
                             All <span className={`text-[12px] font-bold ${activeTab === 'all' ? 'text-white/90' : 'text-gray-400'}`}>{stats.all}</span>
                         </button>
                         <button
+                            onClick={() => { setActiveTab('super admin'); setCurrentPage(1); }}
+                            className={`px-4 py-1.5 rounded-full text-[13px] font-semibold transition-all flex items-center gap-1.5 ${activeTab === 'super admin' ? 'bg-[#B88E2F] text-white shadow-sm border border-[#B88E2F]' : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-300 hover:text-gray-700'}`}
+                        >
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${activeTab === 'super admin' ? 'bg-white' : 'bg-[#9333ea]'}`}></span>
+                            Super Admin <span className={`text-[12px] font-bold ${activeTab === 'super admin' ? 'text-white/90' : 'text-gray-400'}`}>{stats.superAdmin}</span>
+                        </button>
+                        <button
                             onClick={() => { setActiveTab('admin'); setCurrentPage(1); }}
                             className={`px-4 py-1.5 rounded-full text-[13px] font-semibold transition-all flex items-center gap-1.5 ${activeTab === 'admin' ? 'bg-[#B88E2F] text-white shadow-sm border border-[#B88E2F]' : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-300 hover:text-gray-700'}`}
                         >
@@ -229,11 +288,11 @@ export default function UserTable({
                             Admin <span className={`text-[12px] font-bold ${activeTab === 'admin' ? 'text-white/90' : 'text-gray-400'}`}>{stats.admin}</span>
                         </button>
                         <button
-                            onClick={() => { setActiveTab('staff'); setCurrentPage(1); }}
-                            className={`px-4 py-1.5 rounded-full text-[13px] font-semibold transition-all flex items-center gap-1.5 ${activeTab === 'staff' ? 'bg-[#B88E2F] text-white shadow-sm border border-[#B88E2F]' : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-300 hover:text-gray-700'}`}
+                            onClick={() => { setActiveTab('user'); setCurrentPage(1); }}
+                            className={`px-4 py-1.5 rounded-full text-[13px] font-semibold transition-all flex items-center gap-1.5 ${activeTab === 'user' ? 'bg-[#B88E2F] text-white shadow-sm border border-[#B88E2F]' : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-300 hover:text-gray-700'}`}
                         >
-                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${activeTab === 'staff' ? 'bg-white' : 'bg-[#22c55e]'}`}></span>
-                            Staff <span className={`text-[12px] font-bold ${activeTab === 'staff' ? 'text-white/90' : 'text-gray-400'}`}>{stats.staff}</span>
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${activeTab === 'user' ? 'bg-white' : 'bg-[#64748b]'}`}></span>
+                            User <span className={`text-[12px] font-bold ${activeTab === 'user' ? 'text-white/90' : 'text-gray-400'}`}>{stats.user}</span>
                         </button>
                         <button
                             onClick={() => { setActiveTab('active'); setCurrentPage(1); }}
@@ -241,6 +300,13 @@ export default function UserTable({
                         >
                             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${activeTab === 'active' ? 'bg-white' : 'bg-[#22c55e]'}`}></span>
                             Active <span className={`text-[12px] font-bold ${activeTab === 'active' ? 'text-white/90' : 'text-gray-400'}`}>{stats.active}</span>
+                        </button>
+                        <button
+                            onClick={() => { setActiveTab('banned'); setCurrentPage(1); }}
+                            className={`px-4 py-1.5 rounded-full text-[13px] font-semibold transition-all flex items-center gap-1.5 ${activeTab === 'banned' ? 'bg-[#B88E2F] text-white shadow-sm border border-[#B88E2F]' : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-300 hover:text-gray-700'}`}
+                        >
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${activeTab === 'banned' ? 'bg-white' : 'bg-[#ef4444]'}`}></span>
+                            Banned <span className={`text-[12px] font-bold ${activeTab === 'banned' ? 'text-white/90' : 'text-gray-400'}`}>{stats.banned}</span>
                         </button>
                     </div>
 
@@ -336,7 +402,7 @@ export default function UserTable({
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold tracking-wide ${user.is_active !== false ? 'bg-[#f0fdf4] text-[#22c55e]' : 'bg-[#fef2f2] text-[#ef4444]'}`}>
                                                     <span className={`w-1.5 h-1.5 rounded-full ${user.is_active !== false ? 'bg-[#22c55e]' : 'bg-[#ef4444]'}`}></span>
-                                                    {user.is_active !== false ? 'ACTIVE' : 'INACTIVE'}
+                                                    {user.is_active !== false ? 'ACTIVE' : 'BANNED'}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-right" onClick={e => e.stopPropagation()}>
@@ -399,7 +465,7 @@ export default function UserTable({
                                         {user.role}
                                     </span>
                                     <span className={`px-2.5 py-1 rounded-full text-[11px] font-extrabold tracking-wide ${user.is_active !== false ? 'bg-[#f0fdf4] text-[#22c55e]' : 'bg-[#fef2f2] text-[#ef4444]'}`}>
-                                        {user.is_active !== false ? 'Active' : 'Inactive'}
+                                        {user.is_active !== false ? 'Active' : 'Banned'}
                                     </span>
                                 </div>
 
@@ -440,6 +506,20 @@ export default function UserTable({
                                     <Pencil size={14} className="text-[#B88E2F]" />
                                 </div>
                                 Edit
+                            </button>
+                            <div className="h-px bg-gray-100 my-1 mx-3"></div>
+                            <button
+                                onClick={() => handleBanToggleClick(user)}
+                                className={`w-full text-left px-4 py-2.5 text-[13px] font-semibold flex items-center gap-3 transition-colors group/item ${
+                                    user.is_active !== false ? 'text-amber-600 hover:bg-amber-50' : 'text-emerald-600 hover:bg-emerald-50'
+                                }`}
+                            >
+                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
+                                    user.is_active !== false ? 'bg-amber-50 group-hover/item:bg-amber-100' : 'bg-emerald-50 group-hover/item:bg-emerald-100'
+                                }`}>
+                                    {user.is_active !== false ? <Ban size={14} className="text-amber-600" /> : <CheckCircle size={14} className="text-emerald-600" />}
+                                </div>
+                                {user.is_active !== false ? 'Ban User' : 'Unban User'}
                             </button>
                             <div className="h-px bg-gray-100 my-1 mx-3"></div>
                             <button
@@ -526,9 +606,24 @@ export default function UserTable({
                 onCancel={() => setDeleteOpen(false)}
             />
 
+            <ConfirmModal
+                isOpen={banModalOpen}
+                title={banTarget?.is_active === false ? "Unban user" : "Ban user"}
+                message={
+                    banTarget?.is_active === false
+                        ? `Are you sure you want to unban "${banTarget?.username}"? They will regain access to log in and use the system.`
+                        : `Are you sure you want to ban "${banTarget?.username}"? They will no longer be able to log in or use the system.`
+                }
+                confirmText={banTarget?.is_active === false ? "Unban" : "Ban User"}
+                cancelText="Cancel"
+                type={banTarget?.is_active === false ? "success" : "danger"}
+                onConfirm={confirmBanToggle}
+                onCancel={() => { setBanModalOpen(false); setBanTarget(null); }}
+            />
+
             {/* Floating bulk-action bar */}
             {selectedIds.size > 0 && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-white border border-gray-200 shadow-[0_8px_30px_-4px_rgba(0,0,0,0.15)] rounded-2xl px-6 py-3 animate-in slide-in-from-bottom-4 duration-200">
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-white border border-gray-200 shadow-[0_8px_30px_-4px_rgba(0,0,0,0.15)] rounded-2xl px-6 py-3 animate-in slide-in-from-bottom-4 duration-200">
                     <span className="text-[14px] font-bold text-gray-800">
                         {selectedIds.size} selected
                     </span>
@@ -540,8 +635,22 @@ export default function UserTable({
                         Clear
                     </button>
                     <button
+                        onClick={() => handleBulkBan(false)}
+                        className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white text-[13px] font-bold px-3.5 py-2 rounded-xl transition-colors shadow-sm"
+                    >
+                        <Ban size={14} />
+                        Ban
+                    </button>
+                    <button
+                        onClick={() => handleBulkBan(true)}
+                        className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[13px] font-bold px-3.5 py-2 rounded-xl transition-colors shadow-sm"
+                    >
+                        <CheckCircle size={14} />
+                        Unban
+                    </button>
+                    <button
                         onClick={() => setBulkDeleteOpen(true)}
-                        className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white text-[13px] font-bold px-4 py-2 rounded-xl transition-colors shadow-sm"
+                        className="flex items-center gap-1.5 bg-red-500 hover:bg-red-600 text-white text-[13px] font-bold px-3.5 py-2 rounded-xl transition-colors shadow-sm"
                     >
                         <Trash2 size={14} />
                         Delete
@@ -619,7 +728,7 @@ export default function UserTable({
                                     </span>
                                     <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold tracking-wide ${detailUser.is_active !== false ? 'bg-[#f0fdf4] text-[#22c55e]' : 'bg-[#fef2f2] text-[#ef4444]'}`}>
                                         <span className={`w-1.5 h-1.5 rounded-full ${detailUser.is_active !== false ? 'bg-[#22c55e]' : 'bg-[#ef4444]'}`}></span>
-                                        {detailUser.is_active !== false ? 'ACTIVE' : 'INACTIVE'}
+                                        {detailUser.is_active !== false ? 'ACTIVE' : 'BANNED'}
                                     </span>
                                 </div>
 
@@ -655,12 +764,23 @@ export default function UserTable({
                             </div>
 
                             {/* Action footer */}
-                            <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
+                            <div className="px-6 py-4 border-t border-gray-100 flex gap-2">
                                 <button
                                     onClick={() => { handleEditUser(detailUser); setDetailUser(null); }}
                                     className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-gray-200 text-[13px] font-bold text-gray-700 hover:bg-gray-50 transition-colors"
                                 >
                                     <Pencil size={15} /> Edit
+                                </button>
+                                <button
+                                    onClick={() => handleBanToggleClick(detailUser)}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[13px] font-bold transition-colors border ${
+                                        detailUser.is_active !== false
+                                            ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                                            : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                    }`}
+                                >
+                                    {detailUser.is_active !== false ? <Ban size={15} /> : <CheckCircle size={15} />}
+                                    {detailUser.is_active !== false ? 'Ban' : 'Unban'}
                                 </button>
                                 <button
                                     onClick={() => { handleDeleteClick(detailUser); setDetailUser(null); }}

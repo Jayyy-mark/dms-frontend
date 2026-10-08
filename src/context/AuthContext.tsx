@@ -13,6 +13,7 @@ export type User = {
   email: string;
   role: string;
   staff_id: number;
+  is_active?: boolean;
 };
 
 export type FeaturePermissionRecord = {
@@ -72,6 +73,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchCurrentUser = async () => {
     try {
       const { data } = await api.get("auth/user/");
+      if (data && data.is_active === false) {
+        await logout();
+        return;
+      }
       setUser(data);
       // Once user is identified, fetch their live permissions
       try {

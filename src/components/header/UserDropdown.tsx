@@ -21,8 +21,8 @@ export default function UserDropdown() {
         onClick={toggleDropdown}
         className="flex items-center text-gray-700 dropdown-toggle dark:text-gray-400"
       >
-        <span className="mr-2 overflow-hidden rounded-full h-9 w-9 border border-gray-200">
-          <img src="/images/user/user-20.jpg" alt="User" className="w-full h-full object-cover" />
+        <span className="flex items-center justify-center mr-2 rounded-full h-9 w-9 bg-red-100 text-red-600 dark:bg-red-950/50 dark:text-red-400 font-bold text-sm select-none">
+          {user?.username ? user.username.trim().charAt(0).toUpperCase() : "U"}
         </span>
 
         <span className="block mr-1 text-xs font-semibold text-gray-800 dark:text-gray-200">{user?.username}</span>

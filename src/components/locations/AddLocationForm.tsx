@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useDropzone } from "react-dropzone";
 import { CloudUpload, X, Trash2, MapPin, Image as ImageIcon, Plus } from "lucide-react";
@@ -128,11 +128,45 @@ export default function AddLocationForm() {
     fetchOptions();
   }, []);
 
-  const locationTypeOptions =
-    locationOptions?.location_types.map((type) => ({
+  const [customTypeOptions, setCustomTypeOptions] = useState<string[]>([]);
+  const [typeInputValue, setTypeInputValue] = useState("");
+  const [isManualTypeInput, setIsManualTypeInput] = useState(false);
+
+  const locationTypeOptions = useMemo(() => {
+    const fromApi = locationOptions?.location_types || [];
+    const combined = Array.from(
+      new Set(
+        [...fromApi, ...customTypeOptions, form.location_type]
+          .map((s) => (typeof s === "string" ? s.trim() : ""))
+          .filter(Boolean)
+      )
+    );
+    return combined.map((type) => ({
       value: type,
       label: type,
-    })) || [];
+    }));
+  }, [locationOptions, customTypeOptions, form.location_type]);
+
+  const handleSelectOrCreateType = (inputValue: string) => {
+    const trimmed = inputValue.trim();
+    if (!trimmed) {
+      handleChange("location_type", "");
+      return;
+    }
+
+    // Check if an existing option matches (case-insensitive)
+    const existing = locationTypeOptions.find(
+      (opt) => opt.value.trim().toLowerCase() === trimmed.toLowerCase()
+    );
+
+    if (existing) {
+      handleChange("location_type", existing.value);
+    } else {
+      setCustomTypeOptions((prev) => Array.from(new Set([...prev, trimmed])));
+      handleChange("location_type", trimmed);
+      toast.info(`${t("New activity type added") || "New activity type added"}: "${trimmed}"`);
+    }
+  };
 
   const handleChange = (field: string, value: any) => {
     setForm((prev) => ({
@@ -284,53 +318,152 @@ export default function AddLocationForm() {
 
             {/* Activity Type */}
             <div>
-              <Label htmlFor="location_type">
-                {t("Activity Type")} <span className="text-rose-500">*</span>
-              </Label>
-              <CreatableSelect
-                isClearable
-                menuPortalTarget={typeof document !== "undefined" ? document.body : null}
-                menuPosition="fixed"
-                options={locationTypeOptions}
-                value={
-                  locationTypeOptions.find((o) => o.value === form.location_type) ||
-                  (form.location_type ? { value: form.location_type, label: form.location_type } : null)
-                }
-                onChange={(option) => handleChange("location_type", option?.value || "")}
-                placeholder={locationTypeOptions.length === 0 ? t("Type new or select...") : t("Select or type type...")}
-                formatCreateLabel={(inputValue) => `${t("Create")} "${inputValue}"`}
-                styles={{
-                  control: (base, state) => ({
-                    ...base,
-                    borderRadius: "0.75rem",
-                    minHeight: "44px",
-                    borderColor: state.isFocused ? "#B88E2F" : "#e5e7eb",
-                    boxShadow: state.isFocused ? "0 0 0 3px rgba(184, 142, 47, 0.15)" : "none",
-                    padding: "2px",
-                    fontSize: "0.875rem",
-                    backgroundColor: "#ffffff",
-                    "&:hover": {
-                      borderColor: "#B88E2F",
-                    },
-                  }),
-                  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-                  menu: (base) => ({
-                    ...base,
-                    borderRadius: "0.75rem",
-                    boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
-                    border: "1px solid #e5e7eb",
-                    overflow: "hidden",
-                    zIndex: 9999,
-                  }),
-                  option: (base, state) => ({
-                    ...base,
-                    fontSize: "0.875rem",
-                    backgroundColor: state.isSelected ? "#FEF3C7" : state.isFocused ? "#fffbe0" : "#ffffff",
-                    color: state.isSelected ? "#B88E2F" : "#1e293b",
-                    cursor: "pointer",
-                  }),
-                }}
-              />
+              <div className="flex items-center justify-between mb-1.5">
+                <Label htmlFor="location_type" className="mb-0">
+                  {t("Activity Type")} <span className="text-rose-500">*</span>
+                </Label>
+                <div className="flex items-center gap-2">
+                  {form.location_type && (
+                    <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                      {locationOptions?.location_types?.includes(form.location_type)
+                        ? t("Existing type") || "Existing type"
+                        : t("New type") || "New type"}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsManualTypeInput(!isManualTypeInput);
+                      setTypeInputValue("");
+                    }}
+                    className="text-xs font-semibold text-[#B88E2F] hover:text-amber-700 hover:underline transition-colors flex items-center gap-1"
+                  >
+                    {isManualTypeInput
+                      ? t("← Select from list") || "← Select from list"
+                      : t("+ Type custom directly") || "+ Type custom directly"}
+                  </button>
+                </div>
+              </div>
+
+              {isManualTypeInput ? (
+                <div className="relative">
+                  <Input
+                    name="location_type"
+                    id="location_type"
+                    placeholder={t("Type custom activity type...") || "Type custom activity type..."}
+                    value={form.location_type}
+                    onChange={(e) => handleSelectOrCreateType(e.target.value)}
+                    className="bg-white border-gray-200 pr-10"
+                    autoFocus
+                  />
+                  {form.location_type && (
+                    <button
+                      type="button"
+                      onClick={() => handleChange("location_type", "")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
+                      title={t("Clear") || "Clear"}
+                    >
+                      <X size={15} />
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <CreatableSelect
+                  isClearable
+                  isSearchable
+                  createOptionPosition="first"
+                  menuPortalTarget={typeof document !== "undefined" ? document.body : null}
+                  menuPosition="fixed"
+                  options={locationTypeOptions}
+                  value={
+                    locationTypeOptions.find((o) => o.value === form.location_type) ||
+                    (form.location_type ? { value: form.location_type, label: form.location_type } : null)
+                  }
+                  inputValue={typeInputValue}
+                  onInputChange={(newInput, actionMeta) => {
+                    if (actionMeta.action === "input-change") {
+                      setTypeInputValue(newInput);
+                    } else if (actionMeta.action === "set-value" || actionMeta.action === "menu-close") {
+                      setTypeInputValue("");
+                    }
+                  }}
+                  onChange={(option) => {
+                    if (option) {
+                      handleSelectOrCreateType(option.value);
+                    } else {
+                      handleChange("location_type", "");
+                    }
+                    setTypeInputValue("");
+                  }}
+                  onCreateOption={(newOption) => {
+                    handleSelectOrCreateType(newOption);
+                    setTypeInputValue("");
+                  }}
+                  onBlur={() => {
+                    if (typeInputValue.trim()) {
+                      handleSelectOrCreateType(typeInputValue.trim());
+                      setTypeInputValue("");
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && typeInputValue.trim()) {
+                      e.preventDefault();
+                      handleSelectOrCreateType(typeInputValue.trim());
+                      setTypeInputValue("");
+                    }
+                  }}
+                  isValidNewOption={(inputValue, _selectValue, selectOptions) => {
+                    const trimmed = inputValue?.trim();
+                    if (!trimmed) return false;
+                    return !selectOptions.some(
+                      (opt) => opt.label.trim().toLowerCase() === trimmed.toLowerCase()
+                    );
+                  }}
+                  placeholder={
+                    locationTypeOptions.length === 0
+                      ? t("Type new or select...")
+                      : t("Select or type type...")
+                  }
+                  formatCreateLabel={(inputValue) => `+ ${t("Create new")} "${inputValue}"`}
+                  noOptionsMessage={({ inputValue }) =>
+                    inputValue?.trim()
+                      ? `${t("Press Enter to create")} "${inputValue}"`
+                      : t("No options. Type to create new...")
+                  }
+                  styles={{
+                    control: (base, state) => ({
+                      ...base,
+                      borderRadius: "0.75rem",
+                      minHeight: "44px",
+                      borderColor: state.isFocused ? "#B88E2F" : "#e5e7eb",
+                      boxShadow: state.isFocused ? "0 0 0 3px rgba(184, 142, 47, 0.15)" : "none",
+                      padding: "2px",
+                      fontSize: "0.875rem",
+                      backgroundColor: "#ffffff",
+                      "&:hover": {
+                        borderColor: "#B88E2F",
+                      },
+                    }),
+                    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                    menu: (base) => ({
+                      ...base,
+                      borderRadius: "0.75rem",
+                      boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
+                      border: "1px solid #e5e7eb",
+                      overflow: "hidden",
+                      zIndex: 9999,
+                    }),
+                    option: (base, state) => ({
+                      ...base,
+                      fontSize: "0.875rem",
+                      backgroundColor: state.isSelected ? "#FEF3C7" : state.isFocused ? "#fffbe0" : "#ffffff",
+                      color: state.isSelected ? "#B88E2F" : "#1e293b",
+                      cursor: "pointer",
+                      fontWeight: state.isSelected ? 600 : 400,
+                    }),
+                  }}
+                />
+              )}
               <FieldError message={errors.location_type} />
             </div>
 
@@ -545,10 +678,13 @@ export default function AddLocationForm() {
           initialLng={form.longitude}
           onClose={() => setShowMap(false)}
           onSelect={(position) => {
+            console.log("this is the selected position : ", position);
             setForm((prev) => ({
               ...prev,
               latitude: position.lat,
               longitude: position.lng,
+              city: position.city || prev.city,
+              state_division: position.state_division || prev.state_division,
             }));
           }}
         />

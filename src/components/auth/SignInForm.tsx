@@ -29,22 +29,45 @@ export default function SignInForm() {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!form.email.trim() || !form.password.trim()) {
+      await toast.warning("Please enter both email and password.");
+      return;
+    }
+
     try {
-
       const response = await authApi.login(form);
-      await toast.success("Login Successful!");
-      console.log("SEVER RESPONSE :", response);
+      const user = response?.user;
 
-      const user = response.user;
       if (!user) throw new Error("User not returned from login");
+
+      if (user.is_active === false) {
+        await toast.error("Your account has been banned.");
+        return;
+      }
+
+      await toast.success("Login Successful!");
+      console.log("SERVER RESPONSE :", response);
+
       setUser(user);
       setTimeout(() => {
         navigate('/');
       }, 1000);
 
     } catch (error: any) {
-      console.log(error?.response?.data?.non_field_errors[0]);
-      await toast.warning(error?.response?.data?.non_field_errors?.[0] || 'Invalid Credentials');
+      const data = error?.response?.data;
+      const errorMsg =
+        data?.non_field_errors?.[0] ||
+        data?.detail ||
+        data?.error ||
+        data?.message ||
+        'Invalid Credentials';
+
+      console.log("Login error:", errorMsg);
+      if (typeof errorMsg === 'string' && errorMsg.toLowerCase().includes('banned')) {
+        await toast.error(errorMsg);
+      } else {
+        await toast.warning(errorMsg);
+      }
     }
   };
   return (
@@ -113,7 +136,9 @@ export default function SignInForm() {
                   </div>
                 </div>
                 <div>
-                  <Button className="w-full" size="sm">
+                  <Button className="w-full" size="sm"
+                    onClick={handleSignIn}
+                  >
                     Sign in
                   </Button>
                 </div>

@@ -28,7 +28,7 @@ export default function Users() {
   const totalUsers = users.length;
   const adminUsers = users.filter(u => u.role === 'admin' || u.role === 'Admin').length;
   const activeUsers = users.filter(u => u.is_active !== false).length;
-  const inactiveUsers = users.filter(u => u.is_active === false).length;
+  const bannedUsers = users.filter(u => u.is_active === false).length;
 
   return (
     <div className="bg-[#fcfdff] min-h-screen pb-10">
@@ -78,8 +78,8 @@ export default function Users() {
           <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-[0_2px_20px_-8px_rgba(0,0,0,0.05)] flex items-center gap-5">
             <div className="p-3.5 bg-[#fef2f2] rounded-full text-[#ef4444]"><UserX size={22} /></div>
             <div>
-              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Inactive</p>
-              <h3 className="text-[28px] font-extrabold text-[#0f172a] mt-0.5 leading-none">{inactiveUsers}</h3>
+              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Banned</p>
+              <h3 className="text-[28px] font-extrabold text-[#0f172a] mt-0.5 leading-none">{bannedUsers}</h3>
             </div>
           </div>
         </div>
