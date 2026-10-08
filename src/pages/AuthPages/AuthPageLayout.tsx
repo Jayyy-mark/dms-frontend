@@ -26,7 +26,7 @@ export default function AuthLayout({
                 />
               </Link>
               <p className="text-center text-gray-400 dark:text-white/60">
-                Myanmar Oil and Gas Enterprise
+                Myanma Oil and Gas Enterprise
               </p>
             </div>
           </div>

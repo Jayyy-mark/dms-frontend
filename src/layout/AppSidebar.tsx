@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 
-// Assume these icons are imported from an icon library
+// Icons
 import {
   ChevronDownIcon,
   GridIcon,
@@ -12,16 +12,23 @@ import {
 import { useSidebar } from "../context/SidebarContext";
 import SidebarWidget from "./SidebarWidget";
 import {
-  ArchiveIcon, Award, BookAIcon, Building,
-  Building2, DoorOpen, FoldersIcon, Landmark, Layers, NotebookIcon,
-  RecycleIcon, Shield, UserCog, UsersIcon
-}
-  from "lucide-react";
+  ArchiveIcon,
+  Award,
+  BookAIcon,
+  Building,
+  Building2,
+  DoorOpen,
+  FoldersIcon,
+  Landmark,
+  Layers,
+  NotebookIcon,
+  RecycleIcon,
+  Shield,
+  UserCog,
+  UsersIcon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useAuth } from "../context/AuthContext";
-import { getStoredModules, MODULE_CHANGE_EVENT } from "../utils/moduleManager";
-
-
+import { useAuth, PermissionAction } from "../context/AuthContext";
 
 type Role = "admin" | "user" | "super admin";
 
@@ -33,36 +40,78 @@ type NavItem = {
   subItems?: { name: string; path: string; roles?: Role[]; pro?: boolean; new?: boolean }[];
 };
 
+/**
+ * Mapping of sidebar paths to their governed feature key and required action.
+ * If the user's role does not possess the required action permission (or the feature
+ * is disabled in ModulesControl), the path is automatically hidden.
+ */
+const PATH_PERMISSIONS: Record<string, { feature: string; action: PermissionAction }> = {
+  // Dashboard
+  "/dashboard/documents": { feature: "documents", action: "view" },
+  "/dashboard/locations": { feature: "locations", action: "view" },
+
+  // Users
+  "/users/": { feature: "users", action: "view" },
+  "/users/add/": { feature: "users", action: "add" },
+  "/users/chatbot/": { feature: "chatbot", action: "view" },
+
+  // Activity Records / Locations
+  "/locations/": { feature: "locations", action: "view" },
+  "/locations/add/": { feature: "locations", action: "add" },
+
+  // Facilities & Departments
+  "/departments/": { feature: "departments", action: "view" },
+  "/buildings/": { feature: "buildings", action: "view" },
+  "/rooms/": { feature: "rooms", action: "view" },
+
+  // Staffs & HR
+  "/staffs/": { feature: "employees", action: "view" },
+  "/staffs/add/": { feature: "employees", action: "add" },
+  "/stypes/": { feature: "staff_types", action: "view" },
+  "/roles/": { feature: "roles", action: "view" },
+  "/ranks/": { feature: "ranks", action: "view" },
+  "/logs/": { feature: "logs", action: "view" },
+
+  // Documents Management
+  "/documents/": { feature: "documents", action: "view" },
+  "/documents/add/": { feature: "documents", action: "add" },
+  "/documents/deepsearch/": { feature: "deepsearch", action: "view" },
+  "/documents/archives/": { feature: "archives", action: "view" },
+  "/documents/recycles/": { feature: "recycle_bin", action: "view" },
+  "/dtypes/": { feature: "dtypes", action: "view" },
+  "/categories/": { feature: "categories", action: "view" },
+
+};
+
+/** Paths that are always visible or governed by explicit roles rather than matrix */
+const ALWAYS_VISIBLE_PATHS = ["/profile", "/", "/modules", "/settings/user-roles"];
 
 const navItems: NavItem[] = [
   {
     icon: <GridIcon />,
     name: "dashboard",
-    roles: ["admin", "super admin"],
     subItems: [
-      { name: "Overview", path: "/", roles: ["admin", "super admin"] },
-      { name: "Documents", path: "/dashboard/documents", roles: ["admin", "super admin"] },
-      { name: "Photo Locations", path: "/dashboard/locations", roles: ["admin", "super admin"] },
-    ]
+      { name: "Overview", path: "/" },
+      { name: "Documents", path: "/dashboard/documents" },
+      { name: "Photo Locations", path: "/dashboard/locations" },
+    ],
   },
   {
     icon: <UserIcon />,
     name: "users",
-    roles: ["admin", "super admin"],
     subItems: [
-      { name: "User Lists", path: "/users/", roles: ["admin"] },
-      { name: "Add Users", path: "/users/add/", roles: ["admin"] },
-      { name: "Chat bot", path: "/users/chatbot/", roles: ["admin", "super admin"] },
-      { name: "Deep Search", path: "/documents/deepsearch/", roles: ["super admin"] },
-    ]
+      { name: "User Lists", path: "/users/" },
+      { name: "Add Users", path: "/users/add/" },
+      { name: "Chat bot", path: "/users/chatbot/" },
+    ],
   },
   {
     icon: <Landmark />,
     name: "Activity Records",
-    roles: ["admin", "super admin"],
     subItems: [
-      { name: "View Activities", path: "/locations/", roles: ["admin", "super admin"] },
-      { name: "Upload Activities", path: "/locations/add/", roles: ["admin"] },]
+      { name: "View Activities", path: "/locations/" },
+      { name: "Upload Activities", path: "/locations/add/" },
+    ],
   },
 ];
 
@@ -70,7 +119,6 @@ const othersItems: NavItem[] = [
   {
     icon: <UserCircleIcon />,
     name: "User Profile",
-    roles: ["admin", "super admin", "user"],
     path: "/profile",
   },
   {
@@ -80,64 +128,55 @@ const othersItems: NavItem[] = [
     subItems: [
       { name: "Modules", path: "/modules", roles: ["admin", "super admin"] },
       { name: "User Roles & Permissions", path: "/settings/user-roles", roles: ["admin", "super admin"] },
-    ]
-  }
+    ],
+  },
 ];
-
 
 const buildingItems: NavItem[] = [
   {
     icon: <Building2 />,
     name: "departments",
-    path: "/departments/"
+    path: "/departments/",
   },
   {
     icon: <Building />,
     name: "buildings",
-    path: "/buildings/"
+    path: "/buildings/",
   },
   {
     icon: <DoorOpen />,
     name: "rooms",
-    roles: ["admin"],
-    path: "/rooms/"
+    path: "/rooms/",
   },
 ];
-
-
 
 const staffItems: NavItem[] = [
   {
     icon: <UsersIcon />,
     name: "staffs",
-    roles: ["admin", "user", "super admin"],
     subItems: [
-      { name: "Staffs Lists", path: "/staffs/", roles: ["admin", "user", "super admin"] },
-      { name: "Add Staffs", path: "/staffs/add/", roles: ["admin", "user"] },
-    ]
+      { name: "Staffs Lists", path: "/staffs/" },
+      { name: "Add Staffs", path: "/staffs/add/" },
+    ],
   },
   {
     icon: <UserCog />,
     name: "staff_types",
-    roles: ["admin"],
-    path: "/stypes/"
+    path: "/stypes/",
   },
   {
     icon: <Shield />,
     name: "roles",
-    roles: ["admin"],
-    path: "/roles/"
+    path: "/roles/",
   },
   {
     icon: <Award />,
     name: "ranks",
-    roles: ["admin"],
-    path: "/ranks/"
+    path: "/ranks/",
   },
   {
     icon: <NotebookIcon />,
     name: "user_logs",
-    roles: ["admin", "super admin"],
     path: "/logs/",
   },
 ];
@@ -146,131 +185,118 @@ const documentItems: NavItem[] = [
   {
     icon: <BookAIcon />,
     name: "documents",
-    roles: ["admin", "user", "super admin"],
     subItems: [
-      { name: "View Documents", path: "/documents/", roles: ["admin", "user"] },
-      { name: "Upload Documents", path: "/documents/add/", roles: ["admin", "user"] },
-      { name: "Deep Search", path: "/documents/deepsearch/", roles: ["admin", "user", "super admin"] },
-    ]
+      { name: "View Documents", path: "/documents/" },
+      { name: "Upload Documents", path: "/documents/add/" },
+      { name: "Deep Search", path: "/documents/deepsearch/" },
+    ],
   },
   {
     icon: <ArchiveIcon />,
     name: "archives",
-    roles: ["admin", "user"],
     subItems: [
-      { name: "Archived Documents Lists", path: "/documents/archives/", roles: ["admin", "user"] },
-    ]
+      { name: "Archived Documents Lists", path: "/documents/archives/" },
+    ],
   },
   {
     icon: <RecycleIcon />,
     name: "recycle_bin",
-    roles: ["admin", "user"],
     subItems: [
-      { name: "Recycled Documents Lists", path: "/documents/recycles/", roles: ["admin", "user"] },
-    ]
+      { name: "Recycled Documents Lists", path: "/documents/recycles/" },
+    ],
   },
   {
     icon: <Layers />,
     name: "document_types",
-    roles: ["admin"],
     path: "/dtypes/",
   },
   {
     icon: <FoldersIcon />,
     name: "categories",
-    roles: ["admin"],
     path: "/categories/",
   },
 ];
 
-const pathToModuleId: Record<string, string> = {
-  "/departments/": "departments",
-  "/buildings/": "buildings",
-  "/rooms/": "rooms",
-  "/users/": "users",
-  "/users/add/": "users",
-  "/users/edit/": "users",
-  "/users/chatbot/": "chatbot",
-  "/documents/deepsearch/": "deepsearch",
-  "/locations/": "locations",
-  "/locations/add/": "locations",
-  "/locations/edit/": "locations",
-  "/calendar": "calendar",
-  "/logs/": "logs",
-  "/staffs/": "employees",
-  "/staffs/add/": "employees",
-  "/staffs/edit/": "employees",
-  "/stypes/": "staff_types",
-  "/roles/": "roles",
-  "/ranks/": "ranks",
-  "/documents/": "documents",
-  "/documents/add/": "documents",
-  "/documents/edit/": "documents",
-  "/documents/archives/": "archives",
-  "/documents/recycles/": "recycle_bin",
-  "/dtypes/": "dtypes",
-  "/categories/": "categories",
-};
-
 const AppSidebar: React.FC = () => {
-
-  const { user } = useAuth();
-
+  const { user, hasPermission } = useAuth();
   const userRole = user?.role;
 
   const { t } = useTranslation();
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const location = useLocation();
 
-  const [modulesState, setModulesState] = useState<Record<string, boolean>>(getStoredModules);
+  /**
+   * Check if a path is permitted based on UserRolePermission and module status.
+   */
+  const isPathPermitted = useCallback(
+    (path?: string): boolean => {
+      if (!path) return true;
+      if (ALWAYS_VISIBLE_PATHS.includes(path)) return true;
 
-  useEffect(() => {
-    const handleModuleChange = (e: CustomEvent<Record<string, boolean>>) => {
-      setModulesState({ ...e.detail });
-    };
+      const config = PATH_PERMISSIONS[path];
+      if (!config) return true;
 
-    window.addEventListener(MODULE_CHANGE_EVENT as any, handleModuleChange as any);
-    return () => {
-      window.removeEventListener(MODULE_CHANGE_EVENT as any, handleModuleChange as any);
-    };
-  }, []);
+      return hasPermission(config.feature, config.action);
+    },
+    [hasPermission]
+  );
 
-  const isItemEnabled = useCallback((item: { path?: string; subItems?: any[] }): boolean => {
-    if (!item) return true;
-    if (item.path === "/modules" || item.path === "/hr/settings" || item.path === "/settings/user-roles" || item.path === "/profile") return true;
-
-    if (item.subItems && item.subItems.length > 0) {
-      const validSubs = item.subItems.filter(sub => isItemEnabled(sub));
-      return validSubs.length > 0;
-    }
-
-    if (item.path) {
-      const modId = pathToModuleId[item.path];
-      if (modId && modulesState[modId] === false) {
-        return false;
+  /**
+   * Check if a top-level nav item (and its sub-items) should be visible.
+   */
+  const isItemPermitted = useCallback(
+    (item: NavItem): boolean => {
+      // Role-based filter fallback (e.g. for Settings / Modules)
+      if (item.roles && userRole) {
+        const allowed = item.roles.map((r) => r.toLowerCase());
+        if (!allowed.includes(userRole.toLowerCase())) {
+          return false;
+        }
       }
-    }
-    return true;
-  }, [modulesState]);
+
+      // If item has a direct path
+      if (item.path) {
+        return isPathPermitted(item.path);
+      }
+
+      // If item has sub-items, check if at least one sub-item is permitted
+      if (item.subItems && item.subItems.length > 0) {
+        return item.subItems.some((sub) => {
+          if (sub.roles && userRole) {
+            const allowed = sub.roles.map((r) => r.toLowerCase());
+            if (!allowed.includes(userRole.toLowerCase())) {
+              return false;
+            }
+          }
+          return isPathPermitted(sub.path);
+        });
+      }
+
+      return true;
+    },
+    [isPathPermitted, userRole]
+  );
 
   const [openSubmenu, setOpenSubmenu] = useState<{
     type: "main" | "staffs" | "documents" | "buildings" | "others" | "hr";
     name: string;
   } | null>(null);
-  const [subMenuHeight, setSubMenuHeight] = useState<Record<string, number>>(
-    {}
-  );
+  const [subMenuHeight, setSubMenuHeight] = useState<Record<string, number>>({});
   const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const activePath = useMemo(() => {
     const allPaths: string[] = [];
     (["main", "staffs", "documents", "buildings", "others", "hr"] as const).forEach((menuType) => {
       const items =
-        menuType === "main" ? navItems :
-          menuType === "staffs" ? staffItems :
-            menuType === "documents" ? documentItems :
-              menuType === "buildings" ? buildingItems :
-                othersItems;
+        menuType === "main"
+          ? navItems
+          : menuType === "staffs"
+          ? staffItems
+          : menuType === "documents"
+          ? documentItems
+          : menuType === "buildings"
+          ? buildingItems
+          : othersItems;
       items.forEach((nav) => {
         if (nav.path) allPaths.push(nav.path);
         if (nav.subItems) {
@@ -282,13 +308,19 @@ const AppSidebar: React.FC = () => {
     });
 
     let bestMatch = "";
-    const normalizedLoc = location.pathname.endsWith('/') && location.pathname !== '/' ? location.pathname.slice(0, -1) : location.pathname;
+    const normalizedLoc =
+      location.pathname.endsWith("/") && location.pathname !== "/"
+        ? location.pathname.slice(0, -1)
+        : location.pathname;
 
     for (const p of allPaths) {
       if (!p) continue;
-      const normalizedP = p.endsWith('/') && p !== '/' ? p.slice(0, -1) : p;
+      const normalizedP = p.endsWith("/") && p !== "/" ? p.slice(0, -1) : p;
 
-      if ((normalizedLoc === normalizedP || normalizedLoc.startsWith(normalizedP + '/')) && p.length > bestMatch.length) {
+      if (
+        (normalizedLoc === normalizedP || normalizedLoc.startsWith(normalizedP + "/")) &&
+        p.length > bestMatch.length
+      ) {
         bestMatch = p;
       }
     }
@@ -304,11 +336,15 @@ const AppSidebar: React.FC = () => {
     let submenuMatched = false;
     (["main", "staffs", "documents", "buildings", "others", "hr"] as const).forEach((menuType) => {
       const items =
-        menuType === "main" ? navItems :
-          menuType === "staffs" ? staffItems :
-            menuType === "documents" ? documentItems :
-              menuType === "buildings" ? buildingItems :
-                othersItems;
+        menuType === "main"
+          ? navItems
+          : menuType === "staffs"
+          ? staffItems
+          : menuType === "documents"
+          ? documentItems
+          : menuType === "buildings"
+          ? buildingItems
+          : othersItems;
       items.forEach((nav) => {
         if (nav.subItems) {
           nav.subItems.forEach((subItem) => {
@@ -341,7 +377,10 @@ const AppSidebar: React.FC = () => {
     }
   }, [openSubmenu]);
 
-  const handleSubmenuToggle = (name: string, menuType: "main" | "staffs" | "documents" | "buildings" | "others" | "hr") => {
+  const handleSubmenuToggle = (
+    name: string,
+    menuType: "main" | "staffs" | "documents" | "buildings" | "others" | "hr"
+  ) => {
     setOpenSubmenu((prevOpenSubmenu) => {
       if (
         prevOpenSubmenu &&
@@ -354,20 +393,26 @@ const AppSidebar: React.FC = () => {
     });
   };
 
-  const renderMenuItems = (items: NavItem[], menuType: "main" | "staffs" | "documents" | "buildings" | "others" | "hr") => {
-
-    const visibleItems = items
-      .filter(item => !item.roles || item.roles.includes(userRole as Role))
-      .filter(item => isItemEnabled(item));
+  const renderMenuItems = (
+    items: NavItem[],
+    menuType: "main" | "staffs" | "documents" | "buildings" | "others" | "hr"
+  ) => {
+    const visibleItems = items.filter((item) => isItemPermitted(item));
 
     if (visibleItems.length === 0) return null;
 
     return (
       <ul className="flex flex-col gap-1.5">
         {visibleItems.map((nav) => {
-          const visibleSubItems = nav.subItems?.filter(sub =>
-            (!sub.roles || sub.roles.includes(userRole as Role)) && isItemEnabled(sub)
-          );
+          const visibleSubItems = nav.subItems?.filter((sub) => {
+            if (sub.roles && userRole) {
+              const allowed = sub.roles.map((r) => r.toLowerCase());
+              if (!allowed.includes(userRole.toLowerCase())) {
+                return false;
+              }
+            }
+            return isPathPermitted(sub.path);
+          });
 
           const hasSubItems = visibleSubItems && visibleSubItems.length > 0;
 
@@ -376,32 +421,35 @@ const AppSidebar: React.FC = () => {
               {hasSubItems ? (
                 <button
                   onClick={() => handleSubmenuToggle(nav.name, menuType)}
-                  className={`menu-item !py-2.5 !px-3 group ${openSubmenu?.type === menuType && openSubmenu?.name === nav.name
-                    ? "menu-item-active"
-                    : "menu-item-inactive"
-                    } cursor-pointer ${!isExpanded && !isHovered
-                      ? "lg:justify-center"
-                      : "lg:justify-start"
-                    }`}
+                  className={`menu-item !py-2.5 !px-3 group ${
+                    openSubmenu?.type === menuType && openSubmenu?.name === nav.name
+                      ? "menu-item-active"
+                      : "menu-item-inactive"
+                  } cursor-pointer ${
+                    !isExpanded && !isHovered ? "lg:justify-center" : "lg:justify-start"
+                  }`}
                 >
                   <span
-                    className={`menu-item-icon-size flex items-center justify-center shrink-0 ${openSubmenu?.type === menuType && openSubmenu?.name === nav.name
-                      ? "menu-item-icon-active"
-                      : "menu-item-icon-inactive"
-                      }`}
+                    className={`menu-item-icon-size flex items-center justify-center shrink-0 ${
+                      openSubmenu?.type === menuType && openSubmenu?.name === nav.name
+                        ? "menu-item-icon-active"
+                        : "menu-item-icon-inactive"
+                    }`}
                   >
                     {nav.icon}
                   </span>
                   {(isExpanded || isHovered || isMobileOpen) && (
-                    <span className="menu-item-text flex-1 text-left text-xs font-medium leading-snug">{t(nav.name)}</span>
+                    <span className="menu-item-text flex-1 text-left text-xs font-medium leading-snug">
+                      {t(nav.name)}
+                    </span>
                   )}
                   {(isExpanded || isHovered || isMobileOpen) && (
                     <ChevronDownIcon
-                      className={`ml-auto shrink-0 w-4 h-4 transition-transform duration-200 ${openSubmenu?.type === menuType &&
-                        openSubmenu?.name === nav.name
-                        ? "rotate-180 text-white"
-                        : ""
-                        }`}
+                      className={`ml-auto shrink-0 w-4 h-4 transition-transform duration-200 ${
+                        openSubmenu?.type === menuType && openSubmenu?.name === nav.name
+                          ? "rotate-180 text-white"
+                          : ""
+                      }`}
                     />
                   )}
                 </button>
@@ -409,19 +457,23 @@ const AppSidebar: React.FC = () => {
                 nav.path && (
                   <Link
                     to={nav.path}
-                    className={`menu-item !py-2.5 !px-3 group ${isActive(nav.path) ? "menu-item-active" : "menu-item-inactive"
-                      } ${!isExpanded && !isHovered ? "lg:justify-center" : "lg:justify-start"}`}
+                    className={`menu-item !py-2.5 !px-3 group ${
+                      isActive(nav.path) ? "menu-item-active" : "menu-item-inactive"
+                    } ${!isExpanded && !isHovered ? "lg:justify-center" : "lg:justify-start"}`}
                   >
                     <span
-                      className={`menu-item-icon-size flex items-center justify-center shrink-0 ${isActive(nav.path)
-                        ? "menu-item-icon-active"
-                        : "menu-item-icon-inactive"
-                        }`}
+                      className={`menu-item-icon-size flex items-center justify-center shrink-0 ${
+                        isActive(nav.path)
+                          ? "menu-item-icon-active"
+                          : "menu-item-icon-inactive"
+                      }`}
                     >
                       {nav.icon}
                     </span>
                     {(isExpanded || isHovered || isMobileOpen) && (
-                      <span className="menu-item-text flex-1 text-left text-xs font-medium leading-snug">{t(nav.name)}</span>
+                      <span className="menu-item-text flex-1 text-left text-xs font-medium leading-snug">
+                        {t(nav.name)}
+                      </span>
                     )}
                   </Link>
                 )
@@ -444,29 +496,32 @@ const AppSidebar: React.FC = () => {
                       <li key={subItem.name}>
                         <Link
                           to={subItem.path}
-                          className={`menu-dropdown-item !py-2 !px-3 !text-xs ${isActive(subItem.path)
-                            ? "menu-dropdown-item-active"
-                            : "menu-dropdown-item-inactive"
-                            }`}
+                          className={`menu-dropdown-item !py-2 !px-3 !text-xs ${
+                            isActive(subItem.path)
+                              ? "menu-dropdown-item-active"
+                              : "menu-dropdown-item-inactive"
+                          }`}
                         >
                           <span className="leading-snug">{t(subItem.name)}</span>
                           <span className="flex items-center gap-1 ml-auto">
                             {subItem.new && (
                               <span
-                                className={`ml-auto ${isActive(subItem.path)
-                                  ? "menu-dropdown-badge-active"
-                                  : "menu-dropdown-badge-inactive"
-                                  } menu-dropdown-badge !text-[10px] !px-1.5 !py-0.5`}
+                                className={`ml-auto ${
+                                  isActive(subItem.path)
+                                    ? "menu-dropdown-badge-active"
+                                    : "menu-dropdown-badge-inactive"
+                                } menu-dropdown-badge !text-[10px] !px-1.5 !py-0.5`}
                               >
                                 new
                               </span>
                             )}
                             {subItem.pro && (
                               <span
-                                className={`ml-auto ${isActive(subItem.path)
-                                  ? "menu-dropdown-badge-active"
-                                  : "menu-dropdown-badge-inactive"
-                                  } menu-dropdown-badge !text-[10px] !px-1.5 !py-0.5`}
+                                className={`ml-auto ${
+                                  isActive(subItem.path)
+                                    ? "menu-dropdown-badge-active"
+                                    : "menu-dropdown-badge-inactive"
+                                } menu-dropdown-badge !text-[10px] !px-1.5 !py-0.5`}
                               >
                                 pro
                               </span>
@@ -494,9 +549,10 @@ const AppSidebar: React.FC = () => {
   return (
     <aside
       className={`fixed mt-16 flex flex-col lg:mt-0 top-0 px-3.5 left-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-screen transition-all duration-300 ease-in-out z-50 border-r border-gray-200 shadow-sm
-        ${isExpanded || isMobileOpen
-          ? "w-[250px]"
-          : isHovered
+        ${
+          isExpanded || isMobileOpen
+            ? "w-[250px]"
+            : isHovered
             ? "w-[250px]"
             : "w-[80px]"
         }
@@ -506,8 +562,9 @@ const AppSidebar: React.FC = () => {
       onMouseLeave={() => setIsHovered(false)}
     >
       <div
-        className={`py-5 flex ${!isExpanded && !isHovered ? "lg:justify-center" : "justify-start px-3"
-          }`}
+        className={`py-5 flex ${
+          !isExpanded && !isHovered ? "lg:justify-center" : "justify-start px-3"
+        }`}
       >
         <Link to="/" className="flex items-center gap-2.5">
           {isExpanded || isHovered || isMobileOpen ? (
@@ -522,9 +579,7 @@ const AppSidebar: React.FC = () => {
                 src="/images/logo/logo-dark.svg"
                 alt="Logo"
               />
-              <span className="text-xl font-bold text-[#006B2F]">
-                MOGE
-              </span>
+              <span className="text-xl font-bold text-[#006B2F]">MOGE</span>
             </>
           ) : (
             <img
@@ -542,10 +597,9 @@ const AppSidebar: React.FC = () => {
             {mainNode && (
               <div>
                 <h2
-                  className={`mb-2 px-3 text-xs uppercase flex items-center leading-[20px] text-gray-400 font-semibold tracking-wider ${!isExpanded && !isHovered
-                    ? "lg:justify-center"
-                    : "justify-start"
-                    }`}
+                  className={`mb-2 px-3 text-xs uppercase flex items-center leading-[20px] text-gray-400 font-semibold tracking-wider ${
+                    !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
+                  }`}
                 >
                   {isExpanded || isHovered || isMobileOpen ? (
                     t("Menu")
@@ -560,10 +614,9 @@ const AppSidebar: React.FC = () => {
             {docNode && (
               <div>
                 <h2
-                  className={`mb-2 px-3 text-xs uppercase flex items-center leading-[20px] text-gray-400 font-semibold tracking-wider ${!isExpanded && !isHovered
-                    ? "lg:justify-center"
-                    : "justify-start"
-                    }`}
+                  className={`mb-2 px-3 text-xs uppercase flex items-center leading-[20px] text-gray-400 font-semibold tracking-wider ${
+                    !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
+                  }`}
                 >
                   {isExpanded || isHovered || isMobileOpen ? (
                     t("documents")
@@ -578,10 +631,9 @@ const AppSidebar: React.FC = () => {
             {staffNode && (
               <div>
                 <h2
-                  className={`mb-2 px-3 text-xs uppercase flex items-center leading-[20px] text-gray-400 font-semibold tracking-wider ${!isExpanded && !isHovered
-                    ? "lg:justify-center"
-                    : "justify-start"
-                    }`}
+                  className={`mb-2 px-3 text-xs uppercase flex items-center leading-[20px] text-gray-400 font-semibold tracking-wider ${
+                    !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
+                  }`}
                 >
                   {isExpanded || isHovered || isMobileOpen ? (
                     t("staffs")
@@ -593,14 +645,12 @@ const AppSidebar: React.FC = () => {
               </div>
             )}
 
-
             {buildingNode && (
               <div>
                 <h2
-                  className={`mb-2 px-3 text-xs uppercase flex items-center leading-[20px] text-gray-400 font-semibold tracking-wider ${!isExpanded && !isHovered
-                    ? "lg:justify-center"
-                    : "justify-start"
-                    }`}
+                  className={`mb-2 px-3 text-xs uppercase flex items-center leading-[20px] text-gray-400 font-semibold tracking-wider ${
+                    !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
+                  }`}
                 >
                   {isExpanded || isHovered || isMobileOpen ? (
                     t("buildings")
@@ -615,10 +665,9 @@ const AppSidebar: React.FC = () => {
             {othersNode && (
               <div>
                 <h2
-                  className={`mb-2 px-3 text-xs uppercase flex items-center leading-[20px] text-gray-400 font-semibold tracking-wider ${!isExpanded && !isHovered
-                    ? "lg:justify-center"
-                    : "justify-start"
-                    }`}
+                  className={`mb-2 px-3 text-xs uppercase flex items-center leading-[20px] text-gray-400 font-semibold tracking-wider ${
+                    !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
+                  }`}
                 >
                   {isExpanded || isHovered || isMobileOpen ? (
                     t("Others")

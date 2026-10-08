@@ -8,23 +8,25 @@ import {
   CheckSquare,
   Square,
   Save,
+  Loader2,
 } from "lucide-react";
 import PageMeta from "../../components/common/PageMeta";
 import {
   UserRoleItem,
   FeaturePermission,
-  MODULE_PERMISSIONS_STRUCTURE,
-  getStoredUserRoles,
-  addUserRole,
-  deleteUserRole,
-  getRolePermissions,
-  saveRolePermissions,
-  USER_ROLES_CHANGE_EVENT
+  ModuleFeatureGroup,
+  SYSTEM_ROLE_NAMES,
+  buildPermissionStructure,
+  USER_ROLES_CHANGE_EVENT,
 } from "../../utils/userRoleManager";
+import { userRoleApi } from "../../api/userRoleApi";
+import { moduleApi } from "../../api/moduleApi";
 import { toast } from "react-toastify";
 
 export default function UserRolesPage() {
-  const [roles, setRoles] = useState<UserRoleItem[]>(getStoredUserRoles);
+  const [roles, setRoles] = useState<UserRoleItem[]>([]);
+  const [permissionGroups, setPermissionGroups] = useState<ModuleFeatureGroup[]>([]);
+  const [loading, setLoading] = useState(true);
   const [newRoleName, setNewRoleName] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -32,17 +34,35 @@ export default function UserRolesPage() {
   const [selectedRole, setSelectedRole] = useState<UserRoleItem | null>(null);
   const [permissionsState, setPermissionsState] = useState<Record<string, FeaturePermission>>({});
 
+  // Fetch roles and module structure on mount
   useEffect(() => {
-    const handleRolesChange = () => {
-      setRoles(getStoredUserRoles());
+    const fetchData = async () => {
+      try {
+        const [rolesData, modulesData] = await Promise.all([
+          userRoleApi.getRoles(),
+          moduleApi.getModules(),
+        ]);
+
+        setRoles(
+          rolesData.roles.map((r: any) => ({
+            id: r.id,
+            name: r.name,
+            isSystem: SYSTEM_ROLE_NAMES.includes(r.name.toLowerCase()),
+          }))
+        );
+
+        setPermissionGroups(buildPermissionStructure(modulesData.modules));
+      } catch (e) {
+        console.error("Failed to fetch data:", e);
+        toast.error("Failed to load roles data from server.");
+      } finally {
+        setLoading(false);
+      }
     };
-    window.addEventListener(USER_ROLES_CHANGE_EVENT, handleRolesChange);
-    return () => {
-      window.removeEventListener(USER_ROLES_CHANGE_EVENT, handleRolesChange);
-    };
+    fetchData();
   }, []);
 
-  const handleSaveNewRole = (e: React.FormEvent) => {
+  const handleSaveNewRole = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = newRoleName.trim();
     if (!trimmed) {
@@ -50,26 +70,70 @@ export default function UserRolesPage() {
       return;
     }
 
-    const created = addUserRole(trimmed);
-    toast.success(`User Role "${created.name}" saved successfully!`);
-    setNewRoleName("");
+    try {
+      const data = await userRoleApi.createRole(trimmed);
+      setRoles((prev) => [
+        ...prev,
+        {
+          id: data.role.id,
+          name: data.role.name,
+          isSystem: false,
+        },
+      ]);
+      toast.success(`User Role "${data.role.name}" saved successfully!`);
+      window.dispatchEvent(new CustomEvent(USER_ROLES_CHANGE_EVENT));
+      setNewRoleName("");
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || "Failed to create role.";
+      toast.error(msg);
+    }
   };
 
-  const handleDeleteRole = (role: UserRoleItem) => {
+  const handleDeleteRole = async (role: UserRoleItem) => {
     if (role.isSystem) {
       toast.warning(`System role "${role.name}" cannot be deleted.`);
       return;
     }
     if (confirm(`Are you sure you want to delete the user role "${role.name}"?`)) {
-      deleteUserRole(role.id);
-      toast.info(`Deleted user role "${role.name}".`);
+      try {
+        await userRoleApi.deleteRole(role.id);
+        setRoles((prev) => prev.filter((r) => r.id !== role.id));
+        window.dispatchEvent(new CustomEvent(USER_ROLES_CHANGE_EVENT));
+        toast.info(`Deleted user role "${role.name}".`);
+      } catch (e: any) {
+        const msg = e?.response?.data?.message || "Failed to delete role.";
+        toast.error(msg);
+      }
     }
   };
 
-  const handleOpenAssignPermission = (role: UserRoleItem) => {
+  const handleOpenAssignPermission = async (role: UserRoleItem) => {
     setSelectedRole(role);
-    const perms = getRolePermissions(role.id);
-    setPermissionsState(perms);
+    try {
+      const data = await userRoleApi.getPermissions(role.id);
+      // Convert API format { feature: { can_view, can_create, can_edit, can_delete } }
+      // to frontend format { feature: { view, add, edit, delete } }
+      const perms: Record<string, FeaturePermission> = {};
+      Object.entries(data.permissions).forEach(([key, val]: [string, any]) => {
+        perms[key] = {
+          view: val.can_view ?? true,
+          add: val.can_create ?? false,
+          edit: val.can_edit ?? false,
+          delete: val.can_delete ?? false,
+        };
+      });
+      setPermissionsState(perms);
+    } catch (e) {
+      console.error("Failed to load permissions:", e);
+      // Initialize with defaults
+      const perms: Record<string, FeaturePermission> = {};
+      permissionGroups.forEach((group) => {
+        group.features.forEach((feat) => {
+          perms[feat.key] = { view: true, add: false, edit: false, delete: false };
+        });
+      });
+      setPermissionsState(perms);
+    }
   };
 
   const handleTogglePermission = (featureKey: string, action: "view" | "add" | "edit" | "delete") => {
@@ -88,7 +152,7 @@ export default function UserRolesPage() {
   const handleToggleColumnAll = (action: "view" | "add" | "edit" | "delete", targetValue: boolean) => {
     setPermissionsState((prev) => {
       const updated = { ...prev };
-      MODULE_PERMISSIONS_STRUCTURE.forEach((group) => {
+      permissionGroups.forEach((group) => {
         group.features.forEach((feat) => {
           const current = updated[feat.key] || { view: true, add: false, edit: false, delete: false };
           updated[feat.key] = {
@@ -101,18 +165,48 @@ export default function UserRolesPage() {
     });
   };
 
-  const handleSavePermissions = () => {
+  const handleSavePermissions = async () => {
     if (!selectedRole) return;
-    saveRolePermissions(selectedRole.id, permissionsState);
-    toast.success(`Permissions for User Role "${selectedRole.name}" updated successfully!`);
-    setSelectedRole(null);
+    try {
+      // Convert frontend format { view, add, edit, delete }
+      // to API format { can_view, can_create, can_edit, can_delete }
+      const apiPerms: Record<string, any> = {};
+      Object.entries(permissionsState).forEach(([key, val]) => {
+        apiPerms[key] = {
+          can_view: val.view,
+          can_create: val.add,
+          can_edit: val.edit,
+          can_delete: val.delete,
+        };
+      });
+      await userRoleApi.savePermissions(selectedRole.id, apiPerms);
+      window.dispatchEvent(new CustomEvent(USER_ROLES_CHANGE_EVENT));
+      toast.success(`Permissions for User Role "${selectedRole.name}" updated successfully!`);
+      setSelectedRole(null);
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || "Failed to save permissions.";
+      toast.error(msg);
+    }
   };
 
   const filteredRoles = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return roles;
-    return roles.filter((r) => r.name.toLowerCase().includes(q) || r.id.toLowerCase().includes(q));
+    return roles.filter(
+      (r) => r.name.toLowerCase().includes(q) || String(r.id).includes(q)
+    );
   }, [roles, searchQuery]);
+
+  if (loading) {
+    return (
+      <div className="bg-[#fcfdff] min-h-screen flex items-center justify-center">
+        <div className="flex items-center gap-3 text-gray-500">
+          <Loader2 className="w-6 h-6 animate-spin" />
+          <span className="text-sm font-medium">Loading roles & permissions...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-[#fcfdff] min-h-screen pb-12 animate-in fade-in duration-300">
@@ -367,7 +461,7 @@ export default function UserRolesPage() {
                 </thead>
 
                 <tbody className="divide-y divide-gray-100 text-xs">
-                  {MODULE_PERMISSIONS_STRUCTURE.map((group) => (
+                  {permissionGroups.map((group) => (
                     <React.Fragment key={group.moduleName}>
                       {group.features.map((feat, idx) => {
                         const featPerm = permissionsState[feat.key] || {

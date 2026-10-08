@@ -3,7 +3,6 @@ import { Link, useNavigate } from "react-router";
 import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "../../icons";
 import Label from "../form/Label";
 import Input from "../form/input/InputField";
-import Checkbox from "../form/input/Checkbox";
 import Button from "../ui/button/Button";
 import { SignInFormData } from "../../interfaces/auth/SignInFormData";
 import { authApi } from "../../api/auth/authApi";
@@ -12,7 +11,6 @@ import { toast } from "react-toastify";
 
 export default function SignInForm() {
   const [showPassword, setShowPassword] = useState(false);
-  const [isChecked, setIsChecked] = useState(false);
   const navigate = useNavigate();
   const { setUser } = useAuth();
   const [form, setForm] = useState<SignInFormData>({
@@ -31,11 +29,6 @@ export default function SignInForm() {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!isChecked) {
-      alert("You must agree to our term and condition!");
-      return;
-    }
-
     try {
 
       const response = await authApi.login(form);
@@ -50,8 +43,8 @@ export default function SignInForm() {
       }, 1000);
 
     } catch (error: any) {
-      console.log(error);
-      toast.error(error?.message);
+      console.log(error?.response?.data?.non_field_errors[0]);
+      await toast.warning(error?.response?.data?.non_field_errors?.[0] || 'Invalid Credentials');
     }
   };
   return (
@@ -118,20 +111,6 @@ export default function SignInForm() {
                       )}
                     </span>
                   </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Checkbox checked={isChecked} onChange={setIsChecked} />
-                    <span className="block font-normal text-gray-700 text-theme-sm dark:text-gray-400">
-                      Keep me logged in
-                    </span>
-                  </div>
-                  <Link
-                    to="/reset-password"
-                    className="text-sm text-brand-500 hover:text-brand-600 dark:text-brand-400"
-                  >
-                    Forgot password?
-                  </Link>
                 </div>
                 <div>
                   <Button className="w-full" size="sm">

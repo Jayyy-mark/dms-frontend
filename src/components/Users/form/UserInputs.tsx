@@ -14,7 +14,8 @@ import { useTranslation } from "react-i18next";
 import FieldError from "../../form/FieldError.tsx";
 import { useFormErrors } from "../../../hooks/useFormErrors.ts";
 import { parseApiError } from "../../../helpers/parseApiError.ts";
-import { getStoredUserRoles, USER_ROLES_CHANGE_EVENT } from "../../../utils/userRoleManager.ts";
+import { getStoredUserRoles, USER_ROLES_CHANGE_EVENT, UserRoleItem } from "../../../utils/userRoleManager.ts";
+import { userRoleApi } from "../../../api/userRoleApi.ts";
 import { useEffect, useMemo } from "react";
 
 // Roles that do NOT require a linked staff / department on creation
@@ -26,20 +27,32 @@ export default function AddUserFormComponent() {
   const navigate = useNavigate();
   const { errors, validate, setFieldError, clearFieldError } = useFormErrors<AddUserForm>();
 
-  const [userRoles, setUserRoles] = useState(getStoredUserRoles);
+  const [userRoles, setUserRoles] = useState<UserRoleItem[]>(getStoredUserRoles);
 
   useEffect(() => {
-    const handleRolesChange = () => {
-      setUserRoles(getStoredUserRoles());
+    const fetchRoles = () => {
+      userRoleApi
+        .getRoles()
+        .then((data: any) => {
+          const roles = data.user_roles || data;
+          if (Array.isArray(roles) && roles.length > 0) {
+            setUserRoles(roles);
+          }
+        })
+        .catch(() => {
+          setUserRoles(getStoredUserRoles());
+        });
     };
-    window.addEventListener(USER_ROLES_CHANGE_EVENT, handleRolesChange);
+
+    fetchRoles();
+    window.addEventListener(USER_ROLES_CHANGE_EVENT, fetchRoles);
     return () => {
-      window.removeEventListener(USER_ROLES_CHANGE_EVENT, handleRolesChange);
+      window.removeEventListener(USER_ROLES_CHANGE_EVENT, fetchRoles);
     };
   }, []);
 
   const roleOptions = useMemo(() => {
-    return userRoles.map((r) => ({
+    return userRoles.map((r: UserRoleItem) => ({
       value: r.name.toLowerCase(),
       label: r.name,
     }));
@@ -134,7 +147,7 @@ export default function AddUserFormComponent() {
           <Label>Role</Label>
           <Select
             options={roleOptions}
-            value={roleOptions.find((o) => o.value === form.role) ?? null}
+            value={roleOptions.find((o: { value: string; label: string }) => o.value === form.role) ?? null}
             onChange={(option: any) => {
               setForm((prev) => ({
                 ...prev,

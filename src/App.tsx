@@ -78,17 +78,17 @@ export default function App() {
           {/* Dashboard Layout */}
           <Route element={<AppLayout />}>
             <Route index path="/" element={
-              <ProtectedRoute roles={["admin", "super admin"]}>
+              <ProtectedRoute>
                 <Home />
               </ProtectedRoute>
             } />
             <Route path="/dashboard/documents" element={
-              <ProtectedRoute roles={["admin", "super admin"]}>
+              <ProtectedRoute feature="documents" action="view">
                 <DashboardDocuments />
               </ProtectedRoute>
             } />
             <Route path="/dashboard/locations" element={
-              <ProtectedRoute roles={["admin", "super admin"]}>
+              <ProtectedRoute feature="locations" action="view">
                 <DashboardLocations />
               </ProtectedRoute>
             } />
@@ -96,83 +96,88 @@ export default function App() {
             <Route path="/modules" element={<ProtectedRoute roles={["admin", "super admin"]}><ModulesControl /></ProtectedRoute>} />
             <Route path="/settings/user-roles" element={<ProtectedRoute roles={["admin", "super admin"]}><UserRolesPage /></ProtectedRoute>} />
 
-            {/* Others Page */}
-            <Route path="/users/" element={<Users />} />
-            <Route path="/users/add/" element={<AddUser />} />
-            <Route path="/users/edit/" element={<EditUser />} />
-            <Route path="/users/edit/:id" element={<EditUser />} />
-            <Route path="/users/chatbot/" element={<Chatbot />} />
-
+            {/* Users Page */}
+            <Route path="/users/" element={<ProtectedRoute feature="users" action="view"><Users /></ProtectedRoute>} />
+            <Route path="/users/add/" element={<ProtectedRoute feature="users" action="add"><AddUser /></ProtectedRoute>} />
+            <Route path="/users/edit/" element={<ProtectedRoute feature="users" action="edit"><EditUser /></ProtectedRoute>} />
+            <Route path="/users/edit/:id" element={<ProtectedRoute feature="users" action="edit"><EditUser /></ProtectedRoute>} />
+            <Route path="/users/chatbot/" element={<ProtectedRoute feature="chatbot" action="view"><Chatbot /></ProtectedRoute>} />
 
             {/* Departments Page */}
-            <Route path="/departments/" element={<Departments />} />
-            <Route path="/departments/add/" element={<AddDepartments />} />
-            <Route path="/departments/edit/" element={<EditDepartments />} />
-            <Route path="/departments/edit/:id" element={<EditDepartments />} />
+            <Route path="/departments/" element={<ProtectedRoute feature="departments" action="view"><Departments /></ProtectedRoute>} />
+            <Route path="/departments/add/" element={<ProtectedRoute feature="departments" action="add"><AddDepartments /></ProtectedRoute>} />
+            <Route path="/departments/edit/" element={<ProtectedRoute feature="departments" action="edit"><EditDepartments /></ProtectedRoute>} />
+            <Route path="/departments/edit/:id" element={<ProtectedRoute feature="departments" action="edit"><EditDepartments /></ProtectedRoute>} />
 
             {/* Staffs Page */}
-            <Route path="/staffs/" element={
-              <ProtectedRoute roles={["admin", "super admin"]}>
-                <Staffs />
-              </ProtectedRoute>
-            } />
-            <Route path="/staffs/add/" element={<AddStaffs />} />
-            <Route path="/staff/edit/" element={<EditStaffs />} />
-            <Route path="/staff/edit/:id" element={<EditStaffs />} />
+            <Route path="/staffs/" element={<ProtectedRoute feature="employees" action="view"><Staffs /></ProtectedRoute>} />
+            <Route path="/staffs/add/" element={<ProtectedRoute feature="employees" action="add"><AddStaffs /></ProtectedRoute>} />
+            <Route path="/staff/edit/" element={<ProtectedRoute feature="employees" action="edit"><EditStaffs /></ProtectedRoute>} />
+            <Route path="/staff/edit/:id" element={<ProtectedRoute feature="employees" action="edit"><EditStaffs /></ProtectedRoute>} />
 
-            <Route path="/stypes/" element={<Stypes />} />
-            <Route path="/stypes/add/" element={<AddStypes />} />
-            <Route path="/stypes/edit/" element={<EditStypes />} />
-            <Route path="/stypes/edit/:id" element={<EditStypes />} />
+            {/* Staff Types */}
+            <Route path="/stypes/" element={<ProtectedRoute feature="staff_types" action="view"><Stypes /></ProtectedRoute>} />
+            <Route path="/stypes/add/" element={<ProtectedRoute feature="staff_types" action="add"><AddStypes /></ProtectedRoute>} />
+            <Route path="/stypes/edit/" element={<ProtectedRoute feature="staff_types" action="edit"><EditStypes /></ProtectedRoute>} />
+            <Route path="/stypes/edit/:id" element={<ProtectedRoute feature="staff_types" action="edit"><EditStypes /></ProtectedRoute>} />
 
-            <Route path="/dtypes/" element={<Dtypes />} />
-            <Route path="/dtypes/add/" element={<AddDtypes />} />
-            <Route path="/dtypes/edit/" element={<EditDtypes />} />
-            <Route path="/dtypes/edit/:id" element={<EditDtypes />} />
+            {/* Document Types */}
+            <Route path="/dtypes/" element={<ProtectedRoute feature="dtypes" action="view"><Dtypes /></ProtectedRoute>} />
+            <Route path="/dtypes/add/" element={<ProtectedRoute feature="dtypes" action="add"><AddDtypes /></ProtectedRoute>} />
+            <Route path="/dtypes/edit/" element={<ProtectedRoute feature="dtypes" action="edit"><EditDtypes /></ProtectedRoute>} />
+            <Route path="/dtypes/edit/:id" element={<ProtectedRoute feature="dtypes" action="edit"><EditDtypes /></ProtectedRoute>} />
 
-            <Route path="/logs/" element={<Logs />} />
+            {/* Logs */}
+            <Route path="/logs/" element={<ProtectedRoute feature="logs" action="view"><Logs /></ProtectedRoute>} />
 
-            <Route path="/categories/" element={<Category />} />
-            <Route path="/categories/add/" element={<AddCategory />} />
-            <Route path="/categories/edit/" element={<EditCategory />} />
-            <Route path="/categories/edit/:id" element={<EditCategory />} />
+            {/* Categories */}
+            <Route path="/categories/" element={<ProtectedRoute feature="categories" action="view"><Category /></ProtectedRoute>} />
+            <Route path="/categories/add/" element={<ProtectedRoute feature="categories" action="add"><AddCategory /></ProtectedRoute>} />
+            <Route path="/categories/edit/" element={<ProtectedRoute feature="categories" action="edit"><EditCategory /></ProtectedRoute>} />
+            <Route path="/categories/edit/:id" element={<ProtectedRoute feature="categories" action="edit"><EditCategory /></ProtectedRoute>} />
 
-            <Route path="/roles/" element={<Roles />} />
-            <Route path="/roles/add/" element={<AddRoles />} />
-            <Route path="/roles/edit/" element={<EditRoles />} />
-            <Route path="/roles/edit/:id" element={<EditRoles />} />
+            {/* Roles */}
+            <Route path="/roles/" element={<ProtectedRoute feature="roles" action="view"><Roles /></ProtectedRoute>} />
+            <Route path="/roles/add/" element={<ProtectedRoute feature="roles" action="add"><AddRoles /></ProtectedRoute>} />
+            <Route path="/roles/edit/" element={<ProtectedRoute feature="roles" action="edit"><EditRoles /></ProtectedRoute>} />
+            <Route path="/roles/edit/:id" element={<ProtectedRoute feature="roles" action="edit"><EditRoles /></ProtectedRoute>} />
 
-            <Route path="/ranks/" element={<Ranks />} />
-            <Route path="/ranks/add/" element={<AddRanks />} />
-            <Route path="/ranks/edit/" element={<EditRanks />} />
-            <Route path="/ranks/edit/:id" element={<EditRanks />} />
+            {/* Ranks */}
+            <Route path="/ranks/" element={<ProtectedRoute feature="ranks" action="view"><Ranks /></ProtectedRoute>} />
+            <Route path="/ranks/add/" element={<ProtectedRoute feature="ranks" action="add"><AddRanks /></ProtectedRoute>} />
+            <Route path="/ranks/edit/" element={<ProtectedRoute feature="ranks" action="edit"><EditRanks /></ProtectedRoute>} />
+            <Route path="/ranks/edit/:id" element={<ProtectedRoute feature="ranks" action="edit"><EditRanks /></ProtectedRoute>} />
 
-            <Route path="/buildings/" element={<Buildings />} />
-            <Route path="/buildings/add/" element={<AddBuildings />} />
-            <Route path="/buildings/edit/" element={<EditBuildings />} />
-            <Route path="/buildings/edit/:id" element={<EditBuildings />} />
+            {/* Buildings */}
+            <Route path="/buildings/" element={<ProtectedRoute feature="buildings" action="view"><Buildings /></ProtectedRoute>} />
+            <Route path="/buildings/add/" element={<ProtectedRoute feature="buildings" action="add"><AddBuildings /></ProtectedRoute>} />
+            <Route path="/buildings/edit/" element={<ProtectedRoute feature="buildings" action="edit"><EditBuildings /></ProtectedRoute>} />
+            <Route path="/buildings/edit/:id" element={<ProtectedRoute feature="buildings" action="edit"><EditBuildings /></ProtectedRoute>} />
 
-            <Route path="/rooms/" element={<Rooms />} />
-            <Route path="/rooms/add/" element={<AddRooms />} />
-            <Route path="/rooms/edit/" element={<EditRooms />} />
-            <Route path="/rooms/edit/:id" element={<EditRooms />} />
+            {/* Rooms */}
+            <Route path="/rooms/" element={<ProtectedRoute feature="rooms" action="view"><Rooms /></ProtectedRoute>} />
+            <Route path="/rooms/add/" element={<ProtectedRoute feature="rooms" action="add"><AddRooms /></ProtectedRoute>} />
+            <Route path="/rooms/edit/" element={<ProtectedRoute feature="rooms" action="edit"><EditRooms /></ProtectedRoute>} />
+            <Route path="/rooms/edit/:id" element={<ProtectedRoute feature="rooms" action="edit"><EditRooms /></ProtectedRoute>} />
 
-            <Route path="/documents/" element={<Documents />} />
-            <Route path="/documents/add/" element={<AddDocuments />} />
-            <Route path="/documents/edit/" element={<EditDocuments />} />
-            <Route path="/documents/edit/:id" element={<EditDocuments />} />
-            <Route path="/documents/deepsearch/" element={<DeepSearchDocuments />} />
+            {/* Documents */}
+            <Route path="/documents/" element={<ProtectedRoute feature="documents" action="view"><Documents /></ProtectedRoute>} />
+            <Route path="/documents/add/" element={<ProtectedRoute feature="documents" action="add"><AddDocuments /></ProtectedRoute>} />
+            <Route path="/documents/edit/" element={<ProtectedRoute feature="documents" action="edit"><EditDocuments /></ProtectedRoute>} />
+            <Route path="/documents/edit/:id" element={<ProtectedRoute feature="documents" action="edit"><EditDocuments /></ProtectedRoute>} />
+            <Route path="/documents/deepsearch/" element={<ProtectedRoute feature="deepsearch" action="view"><DeepSearchDocuments /></ProtectedRoute>} />
 
-            <Route path="/locations/" element={<Locations />} />
-            <Route path="/locations/add/" element={<AddLocations />} />
-            <Route path="/locations/edit/" element={<EditLocations />} />
-            <Route path="/locations/edit/:id" element={<EditLocations />} />
+            {/* Locations / Activities */}
+            <Route path="/locations/" element={<ProtectedRoute feature="locations" action="view"><Locations /></ProtectedRoute>} />
+            <Route path="/locations/add/" element={<ProtectedRoute feature="locations" action="add"><AddLocations /></ProtectedRoute>} />
+            <Route path="/locations/edit/" element={<ProtectedRoute feature="locations" action="edit"><EditLocations /></ProtectedRoute>} />
+            <Route path="/locations/edit/:id" element={<ProtectedRoute feature="locations" action="edit"><EditLocations /></ProtectedRoute>} />
 
-            <Route path="/documents/archives/" element={<Archives />} />
-            <Route path="/documents/recycles/" element={<Recycles />} />
-            <Route path="/profile" element={<UserProfiles />} />
+            <Route path="/documents/archives/" element={<ProtectedRoute feature="archives" action="view"><Archives /></ProtectedRoute>} />
+            <Route path="/documents/recycles/" element={<ProtectedRoute feature="recycle_bin" action="view"><Recycles /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute><UserProfiles /></ProtectedRoute>} />
             <Route path="/calendar" element={
-              <ProtectedRoute roles={["admin", "super admin"]}>
+              <ProtectedRoute feature="calendar" action="view">
                 <Calendar />
               </ProtectedRoute>
             }

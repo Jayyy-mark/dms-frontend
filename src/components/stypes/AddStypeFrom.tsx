@@ -12,7 +12,7 @@ import { useFormErrors } from "../../hooks/useFormErrors.ts";
 import { parseApiError } from "../../helpers/parseApiError.ts";
 
 export default function AddStypeForm() {
-  const { t } = useTranslation();
+    const { t } = useTranslation();
 
     const navigate = useNavigate();
     const { errors, validate } = useFormErrors<AddStype>();
@@ -20,7 +20,7 @@ export default function AddStypeForm() {
         stype_name: "",
     });
 
-    const handleSubmit = async() =>{
+    const handleSubmit = async () => {
         const valid = validate([
             { field: "stype_name", value: form.stype_name, label: "Staff type name", required: true },
         ]);
@@ -30,7 +30,8 @@ export default function AddStypeForm() {
             const data = await stypeApi.create(form);
             toast.success(data?.message || "Created successfully!");
             navigate('/stypes/');
-        } catch (error : any) {
+        } catch (error: any) {
+            console.log("this is error : ", error)
             toast.error(parseApiError(error, "Failed to create stype!"));
         }
     };

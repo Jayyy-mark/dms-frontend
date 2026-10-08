@@ -45,52 +45,12 @@ export const DEFAULT_MODULES: AppModule[] = [
   { id: "logs", name: "Audit Logs", myanmarName: "စနစ်မှတ်တမ်းများ", category: "System", description: "System security and activity logs", enabled: true, paths: ["/logs/"] },
 ];
 
-const STORAGE_KEY = "moge_enabled_modules";
 export const MODULE_CHANGE_EVENT = "moge_module_change";
 
-export function getStoredModules(): Record<string, boolean> {
-  try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      return JSON.parse(raw);
-    }
-  } catch (e) {
-    console.error("Failed to parse module settings from sessionStorage:", e);
-  }
-
-  const defaults: Record<string, boolean> = {};
-  DEFAULT_MODULES.forEach(m => {
-    defaults[m.id] = true;
-  });
-  return defaults;
-}
-
-export function setModuleEnabled(id: string, enabled: boolean) {
-  const current = getStoredModules();
-  current[id] = enabled;
-  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(current));
-  window.dispatchEvent(new CustomEvent(MODULE_CHANGE_EVENT, { detail: current }));
-}
-
-export function setAllModulesEnabled(enabled: boolean) {
-  const current: Record<string, boolean> = {};
-  DEFAULT_MODULES.forEach(m => {
-    current[m.id] = enabled;
-  });
-  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(current));
-  window.dispatchEvent(new CustomEvent(MODULE_CHANGE_EVENT, { detail: current }));
-}
-
-export function resetModulesToDefault() {
-  sessionStorage.removeItem(STORAGE_KEY);
-  const defaults: Record<string, boolean> = {};
-  DEFAULT_MODULES.forEach(m => {
-    defaults[m.id] = true;
-  });
-  window.dispatchEvent(new CustomEvent(MODULE_CHANGE_EVENT, { detail: defaults }));
-}
-
-export function isModuleEnabled(id: string): boolean {
-  const stored = getStoredModules();
-  return stored[id] !== false;
+/**
+ * Dispatch a module change event so the sidebar can react.
+ * Called by ModulesControl after API updates.
+ */
+export function dispatchModuleChange(statusMap: Record<string, boolean>) {
+  window.dispatchEvent(new CustomEvent(MODULE_CHANGE_EVENT, { detail: statusMap }));
 }

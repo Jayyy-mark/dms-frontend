@@ -86,7 +86,7 @@ export default function AuditLogWidget() {
   }
 
   return (
-    <div className="flex flex-col rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900" style={{ height: "420px" }}>
+    <div className="flex flex-col rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900" style={{ height: "450px" }}>
       {/* ── Header ── */}
       <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-gray-800">
         <div className="flex items-center gap-2">
@@ -113,7 +113,7 @@ export default function AuditLogWidget() {
       </div>
 
       {/* ── Body ── */}
-      <div className="flex-1 overflow-y-auto px-4 py-3">
+      <div className="flex-1 overflow-y-auto px-4 py-3 mb-3">
         {loading && (
           <div className="flex h-full items-center justify-center">
             <div className="flex flex-col items-center gap-2 text-gray-400">

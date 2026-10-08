@@ -1,25 +1,59 @@
 import { useState, useEffect, useMemo } from "react";
-import { Search, CheckCircle2, XCircle, RotateCcw, Layers } from "lucide-react";
+import { Search, CheckCircle2, XCircle, RotateCcw, Layers, Loader2 } from "lucide-react";
 import PageMeta from "../../components/common/PageMeta";
-import {
-  DEFAULT_MODULES,
-  getStoredModules,
-  setModuleEnabled,
-  setAllModulesEnabled,
-  resetModulesToDefault,
-  MODULE_CHANGE_EVENT
-} from "../../utils/moduleManager";
+import { DEFAULT_MODULES, MODULE_CHANGE_EVENT, dispatchModuleChange } from "../../utils/moduleManager";
+import { moduleApi } from "../../api/moduleApi";
 
 type CategoryFilter = "All" | "System" | "Documents" | "Departments" | "Users";
 
 export default function ModulesControl() {
-  const [modulesState, setModulesState] = useState<Record<string, boolean>>(getStoredModules);
+  // Feature status from backend: featureKey → { dbId, status }
+  const [featureStatusMap, setFeatureStatusMap] = useState<
+    Record<string, { dbId: number; status: boolean }>
+  >({});
+  const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<CategoryFilter>("All");
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Fetch modules with features from backend on mount
+  useEffect(() => {
+    const fetchModules = async () => {
+      try {
+        const data = await moduleApi.getModules();
+        const map: Record<string, { dbId: number; status: boolean }> = {};
+        data.modules.forEach((m: any) => {
+          m.features.forEach((f: any) => {
+            map[f.name] = { dbId: f.id, status: f.status };
+          });
+        });
+        setFeatureStatusMap(map);
+      } catch (e) {
+        console.error("Failed to fetch modules from backend:", e);
+        // Fallback: all modules enabled
+        const fallback: Record<string, { dbId: number; status: boolean }> = {};
+        DEFAULT_MODULES.forEach((m, i) => {
+          fallback[m.id] = { dbId: i + 1, status: true };
+        });
+        setFeatureStatusMap(fallback);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchModules();
+  }, []);
+
+  // Listen for external module change events
   useEffect(() => {
     const handleModuleChange = (e: CustomEvent<Record<string, boolean>>) => {
-      setModulesState({ ...e.detail });
+      setFeatureStatusMap((prev) => {
+        const updated = { ...prev };
+        Object.entries(e.detail).forEach(([key, status]) => {
+          if (updated[key]) {
+            updated[key] = { ...updated[key], status };
+          }
+        });
+        return updated;
+      });
     };
 
     window.addEventListener(MODULE_CHANGE_EVENT as any, handleModuleChange as any);
@@ -28,21 +62,83 @@ export default function ModulesControl() {
     };
   }, []);
 
-  const handleToggle = (id: string) => {
-    const nextVal = !modulesState[id];
-    setModuleEnabled(id, nextVal);
+  // Dispatch change event helper
+  const emitModuleChange = (updatedMap: Record<string, { dbId: number; status: boolean }>) => {
+    const statusMap: Record<string, boolean> = {};
+    Object.entries(updatedMap).forEach(([key, val]) => {
+      statusMap[key] = val.status;
+    });
+    dispatchModuleChange(statusMap);
   };
 
-  const handleEnableAll = () => {
-    setAllModulesEnabled(true);
+  const handleToggle = async (id: string) => {
+    const feature = featureStatusMap[id];
+    if (!feature) return;
+    const newStatus = !feature.status;
+
+    // Optimistic update
+    const updatedMap = {
+      ...featureStatusMap,
+      [id]: { ...feature, status: newStatus },
+    };
+    setFeatureStatusMap(updatedMap);
+    emitModuleChange(updatedMap);
+
+    try {
+      await moduleApi.toggleFeature(feature.dbId, newStatus);
+    } catch (e) {
+      console.error("Failed to toggle feature:", e);
+      // Revert on error
+      setFeatureStatusMap((prev) => ({
+        ...prev,
+        [id]: { ...prev[id], status: !newStatus },
+      }));
+    }
   };
 
-  const handleDisableAll = () => {
-    setAllModulesEnabled(false);
+  const handleEnableAll = async () => {
+    const updated = { ...featureStatusMap };
+    Object.keys(updated).forEach((key) => {
+      updated[key] = { ...updated[key], status: true };
+    });
+    setFeatureStatusMap(updated);
+    emitModuleChange(updated);
+
+    try {
+      await moduleApi.bulkAction("enable_all");
+    } catch (e) {
+      console.error("Failed to enable all:", e);
+    }
   };
 
-  const handleReset = () => {
-    resetModulesToDefault();
+  const handleDisableAll = async () => {
+    const updated = { ...featureStatusMap };
+    Object.keys(updated).forEach((key) => {
+      updated[key] = { ...updated[key], status: false };
+    });
+    setFeatureStatusMap(updated);
+    emitModuleChange(updated);
+
+    try {
+      await moduleApi.bulkAction("disable_all");
+    } catch (e) {
+      console.error("Failed to disable all:", e);
+    }
+  };
+
+  const handleReset = async () => {
+    const updated = { ...featureStatusMap };
+    Object.keys(updated).forEach((key) => {
+      updated[key] = { ...updated[key], status: true };
+    });
+    setFeatureStatusMap(updated);
+    emitModuleChange(updated);
+
+    try {
+      await moduleApi.bulkAction("reset");
+    } catch (e) {
+      console.error("Failed to reset:", e);
+    }
   };
 
   // Filtered Modules
@@ -64,11 +160,22 @@ export default function ModulesControl() {
   // Statistics
   const totalCount = DEFAULT_MODULES.length;
   const enabledCount = useMemo(() => {
-    return DEFAULT_MODULES.filter((m) => modulesState[m.id] !== false).length;
-  }, [modulesState]);
+    return DEFAULT_MODULES.filter((m) => featureStatusMap[m.id]?.status !== false).length;
+  }, [featureStatusMap]);
   const disabledCount = totalCount - enabledCount;
 
   const categories: CategoryFilter[] = ["All", "System", "Documents", "Departments", "Users"];
+
+  if (loading) {
+    return (
+      <div className="bg-[#fcfdff] min-h-screen flex items-center justify-center">
+        <div className="flex items-center gap-3 text-gray-500">
+          <Loader2 className="w-6 h-6 animate-spin" />
+          <span className="text-sm font-medium">Loading modules...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-[#fcfdff] min-h-screen pb-12 animate-in fade-in duration-300">
@@ -214,7 +321,7 @@ export default function ModulesControl() {
                   </tr>
                 ) : (
                   filteredModules.map((mod) => {
-                    const isEnabled = modulesState[mod.id] !== false;
+                    const isEnabled = featureStatusMap[mod.id]?.status !== false;
 
                     return (
                       <tr key={mod.id} className="hover:bg-[#FEF3C7]/30 transition-colors group">

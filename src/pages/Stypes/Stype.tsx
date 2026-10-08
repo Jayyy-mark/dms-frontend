@@ -124,6 +124,7 @@ export default function Stypes() {
                       setIsAddModalOpen(false);
                       fetchAll(); // Refresh list
                     } catch (error: any) {
+                      console.log(error);
                       toast.error(parseApiError(error, "Failed to create staff type!"));
                     } finally {
                       setIsSubmitting(false);
