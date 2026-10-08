@@ -416,7 +416,7 @@ export default function AddLocationForm() {
                     const trimmed = inputValue?.trim();
                     if (!trimmed) return false;
                     return !selectOptions.some(
-                      (opt) => opt.label.trim().toLowerCase() === trimmed.toLowerCase()
+                      (opt) => Boolean(opt?.label) && String(opt.label).trim().toLowerCase() === trimmed.toLowerCase()
                     );
                   }}
                   placeholder={
