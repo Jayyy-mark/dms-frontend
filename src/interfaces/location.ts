@@ -1,3 +1,5 @@
+import { Department } from "./department";
+
 export interface LocationPhotoItem {
     id: number;
     photo: string;
@@ -17,8 +19,8 @@ export interface Location {
     date: string;
     description: string;
     location_type: string;
-    department_id: string;
-    department?: any;
+    department_id?: string | number;
+    department?: Department | Record<string, unknown> | null;
     department_name?: string;
     file_type?: string;
 }
@@ -68,10 +70,12 @@ export interface UpdateLocation {
     location_name: string;
     latitude: string;
     longitude: string;
-    date: Date | null;
+    date: Date | string | null;
     city: string;
     state_division: string;
     description: string;
     location_type: string;
-    department_id: string;
+    department_id: string | number;
+    department?: Department | Record<string, unknown> | null;
+    department_name?: string;
 }

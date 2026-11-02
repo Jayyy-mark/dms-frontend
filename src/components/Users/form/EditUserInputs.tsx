@@ -12,6 +12,7 @@ import FieldError from "../../form/FieldError.tsx";
 import { useFormErrors } from "../../../hooks/useFormErrors.ts";
 import { parseApiError } from "../../../helpers/parseApiError.ts";
 import { Eye, EyeOff } from "lucide-react";
+import ActionButton from "../../ui/button/ActionButton.tsx";
 
 
 const emptyUser: User = {
@@ -249,9 +250,10 @@ export default function EditUserInputs() {
           >
             {t("Cancel")}
           </button>
-          <button
+          <ActionButton
             type="button"
             onClick={handleSubmit}
+            loadingText={`${t("Update User")}...`}
             className="
               flex items-center gap-2
               px-5 py-2.5
@@ -264,7 +266,7 @@ export default function EditUserInputs() {
             "
           >
             {t("Update User")}
-          </button>
+          </ActionButton>
         </div>
 
       </div>

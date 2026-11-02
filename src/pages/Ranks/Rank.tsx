@@ -9,16 +9,20 @@ import { parseApiError } from "../../helpers/parseApiError";
 
 export default function Ranks() {
   const [ranks, setRanks] = useState<Rank[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState<AddRank>({ rank_name: "" });
 
   const fetchAll = async () => {
+    setIsLoading(true);
     try {
       const data = await rankApi.all();
       setRanks(data.ranks || data);
     } catch (error: any) {
       toast.error(error?.message || "Failed to fetch lists");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -52,13 +56,13 @@ export default function Ranks() {
             <div className="p-3.5 bg-[#FEF3C7] rounded-full text-[#B88E2F]"><EntityIcon size={22} /></div>
             <div>
               <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Total Ranks</p>
-              <h3 className="text-[28px] font-extrabold text-[#0f172a] mt-0.5 leading-none">{total}</h3>
+              <h3 className="text-[28px] font-extrabold text-[#0f172a] mt-0.5 leading-none">{isLoading ? <span className="inline-block h-7 w-16 rounded-lg bg-gray-200 animate-pulse" /> : total}</h3>
             </div>
           </div>
         </div>
 
         <div>
-          <RankTable ranks={ranks} setRanks={setRanks} />
+          <RankTable ranks={ranks} setRanks={setRanks} isLoading={isLoading} />
         </div>
       </div>
 

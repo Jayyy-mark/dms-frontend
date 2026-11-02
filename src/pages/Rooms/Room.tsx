@@ -13,16 +13,20 @@ import Select from "react-select";
 export default function Rooms() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [buildings, setBuildings] = useState<Building[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState<AddRoom>({ room_name: "", room_no: "", building_id: "" });
 
   const fetchAll = async () => {
+    setIsLoading(true);
     try {
       const data = await roomApi.all();
       setRooms(data.rooms || data);
     } catch (error: any) {
       toast.error(error?.message || "Failed to fetch lists");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -66,13 +70,13 @@ export default function Rooms() {
             <div className="p-3.5 bg-[#FEF3C7] rounded-full text-[#B88E2F]"><EntityIcon size={22} /></div>
             <div>
               <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Total Rooms</p>
-              <h3 className="text-[28px] font-extrabold text-[#0f172a] mt-0.5 leading-none">{total}</h3>
+              <h3 className="text-[28px] font-extrabold text-[#0f172a] mt-0.5 leading-none">{isLoading ? <span className="inline-block h-7 w-16 rounded-lg bg-gray-200 animate-pulse" /> : total}</h3>
             </div>
           </div>
         </div>
 
         <div>
-          <RoomTable rooms={rooms} setRooms={setRooms} buildings={buildings} />
+          <RoomTable rooms={rooms} setRooms={setRooms} buildings={buildings} isLoading={isLoading} />
         </div>
       </div>
 

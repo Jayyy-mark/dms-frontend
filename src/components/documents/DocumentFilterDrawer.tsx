@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import {
   X,
@@ -10,6 +10,7 @@ import {
 import { Category } from "../../interfaces/category";
 import { categoryApi } from "../../api/categoryApi";
 import { helper } from "../../helpers/utils";
+import { SpinnerIcon } from "../ui/button/ActionButton";
 
 export interface FilterState {
   sortBy: "recent" | "older" | "popular" | "alphabetical";
@@ -31,8 +32,8 @@ interface DocumentFilterDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   filterState: FilterState;
-  onApplyFilter: (state: FilterState) => void;
-  onClearFilter: () => void;
+  onApplyFilter: (state: FilterState) => void | Promise<unknown>;
+  onClearFilter: () => void | Promise<unknown>;
 }
 
 export default function DocumentFilterDrawer({
@@ -46,10 +47,19 @@ export default function DocumentFilterDrawer({
 
   // Local draft state for persistent editing inside drawer
   const [draftState, setDraftState] = useState<FilterState>(filterState);
+  const [isApplying, setIsApplying] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
+  const busyRef = useRef(false);
+  const isBusy = isApplying || isClearing;
 
   // Sync draftState when drawer opens or filterState changes
   useEffect(() => {
     setDraftState(filterState);
+    if (!isOpen) {
+      setIsApplying(false);
+      setIsClearing(false);
+      busyRef.current = false;
+    }
   }, [filterState, isOpen]);
 
   // Categories & Staff Data
@@ -204,16 +214,32 @@ export default function DocumentFilterDrawer({
     );
   };
 
-  const handleApply = () => {
-    onApplyFilter(draftState);
-    onClose();
+  const handleApply = async () => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setIsApplying(true);
+    try {
+      await onApplyFilter(draftState);
+      onClose();
+    } finally {
+      busyRef.current = false;
+      setIsApplying(false);
+    }
   };
 
-  const handleClear = () => {
-    setDraftState(initialFilterState);
-    setExpandedCategoryIds([]);
-    onClearFilter();
-    onClose();
+  const handleClear = async () => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setIsClearing(true);
+    try {
+      setDraftState(initialFilterState);
+      setExpandedCategoryIds([]);
+      await onClearFilter();
+      onClose();
+    } finally {
+      busyRef.current = false;
+      setIsClearing(false);
+    }
   };
 
   // Top level categories (parent_id is null/empty or parent object is missing)
@@ -395,16 +421,20 @@ export default function DocumentFilterDrawer({
         <div className="p-4 bg-white border-t border-gray-200 sticky bottom-0 z-10 flex items-center justify-between gap-3">
           <button
             type="button"
+            disabled={isBusy}
             onClick={handleClear}
-            className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition text-center"
+            className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition text-center inline-flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
           >
+            {isClearing && <SpinnerIcon className="h-3.5 w-3.5 animate-spin text-gray-700" />}
             {t("Clear Filter")}
           </button>
           <button
             type="button"
+            disabled={isBusy}
             onClick={handleApply}
-            className="flex-1 py-2.5 bg-[#B88E2F] hover:bg-[#997524] text-white text-xs font-bold rounded-xl transition shadow-md text-center"
+            className="flex-1 py-2.5 bg-[#B88E2F] hover:bg-[#997524] text-white text-xs font-bold rounded-xl transition shadow-md text-center inline-flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
           >
+            {isApplying && <SpinnerIcon className="h-3.5 w-3.5 animate-spin text-white" />}
             {t("Apply")}
           </button>
         </div>

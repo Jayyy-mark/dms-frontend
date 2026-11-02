@@ -7,27 +7,33 @@ import { AddUserForm, UserApiByIdResponse, UserApiDeleteResponse } from "../inte
 
 
 export const userApi = {
-    async all():Promise<any>{
+    async all(): Promise<any> {
         const res = await getApi("auth/users/");
         return res;
     },
-    async create(form : AddUserForm) : Promise<any>{
-        const response = await postApi("auth/register/",{
-            username:form.username,
-            email:form.email,
-            password1:form.password1,
-            password2:form.password2,
-            role:form.role,
-            staff_id:form.staff_id,
+    async create(form: AddUserForm): Promise<any> {
+        const parsedStaffId =
+            form.staff_id !== "" && form.staff_id !== null && form.staff_id !== undefined
+                ? Number(form.staff_id)
+                : null;
+        const staffId =
+            parsedStaffId !== null && !Number.isNaN(parsedStaffId) ? parsedStaffId : null;
+
+        const response = await postApi("auth/register/", {
+            username: form.username,
+            email: form.email,
+            password1: form.password1,
+            password2: form.password2,
+            role: form.role,
+            staff_id: staffId,
         });
-        console.log("this is user create response : ",response);
         return response;
     },
-    async getById(id:string):Promise<any>{
+    async getById(id: string): Promise<any> {
         const response = await getApi<UserApiByIdResponse>(`auth/users/${id}/`);
         return response.user;
     },
-    async delete(id : number): Promise<string>{
+    async delete(id: number): Promise<string> {
         const response = await deleteApi<UserApiDeleteResponse>(`auth/users/${id}/`);
         return response.message;
     },

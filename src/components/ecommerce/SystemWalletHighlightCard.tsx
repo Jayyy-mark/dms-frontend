@@ -30,9 +30,13 @@ export default function SystemWalletHighlightCard() {
           <div className="w-14 h-14 rounded-2xl bg-white text-[#B88E2F] flex items-center justify-center shadow-xs border border-amber-200/50 mb-3 dark:bg-gray-800">
             <Archive size={28} />
           </div>
-          <h3 className="text-3xl font-black text-gray-900 dark:text-white tracking-tight">
-            {isLoading ? "..." : formatCount(analytics?.documents)}
-          </h3>
+          {isLoading ? (
+            <div className="h-9 w-24 rounded-lg bg-amber-200/60 dark:bg-gray-700 animate-pulse my-0.5" />
+          ) : (
+            <h3 className="text-3xl font-black text-gray-900 dark:text-white tracking-tight">
+              {formatCount(analytics?.documents)}
+            </h3>
+          )}
           <p className="text-xs font-bold text-gray-500 mt-1 uppercase tracking-wider">
             {t("Total In-House Archival Documents")}
           </p>
@@ -43,9 +47,13 @@ export default function SystemWalletHighlightCard() {
           {/* Card 1 */}
           <div className="rounded-2xl border border-gray-100 bg-gray-50/60 p-5 flex items-center justify-between dark:border-gray-800 dark:bg-gray-800/40">
             <div>
-              <h4 className="text-2xl font-extrabold text-gray-900 dark:text-white">
-                {isLoading ? "..." : formatCount(analytics?.permanent_documents)}
-              </h4>
+              {isLoading ? (
+                <div className="h-7 w-16 rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse mb-1" />
+              ) : (
+                <h4 className="text-2xl font-extrabold text-gray-900 dark:text-white">
+                  {formatCount(analytics?.permanent_documents)}
+                </h4>
+              )}
               <p className="text-xs font-bold text-gray-500 mt-0.5">
                 {t("Permanent Archives")}
               </p>
@@ -58,9 +66,13 @@ export default function SystemWalletHighlightCard() {
           {/* Card 2 */}
           <div className="rounded-2xl border border-gray-100 bg-gray-50/60 p-5 flex items-center justify-between dark:border-gray-800 dark:bg-gray-800/40">
             <div>
-              <h4 className="text-2xl font-extrabold text-gray-900 dark:text-white">
-                {isLoading ? "..." : formatCount(analytics?.temporary_documents)}
-              </h4>
+              {isLoading ? (
+                <div className="h-7 w-16 rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse mb-1" />
+              ) : (
+                <h4 className="text-2xl font-extrabold text-gray-900 dark:text-white">
+                  {formatCount(analytics?.temporary_documents)}
+                </h4>
+              )}
               <p className="text-xs font-bold text-gray-500 mt-0.5">
                 {t("Temporary Archives")}
               </p>
@@ -73,9 +85,13 @@ export default function SystemWalletHighlightCard() {
           {/* Card 3 */}
           <div className="rounded-2xl border border-gray-100 bg-gray-50/60 p-5 flex items-center justify-between dark:border-gray-800 dark:bg-gray-800/40">
             <div>
-              <h4 className="text-2xl font-extrabold text-gray-900 dark:text-white">
-                {isLoading ? "..." : formatCount(analytics?.staffs)}
-              </h4>
+              {isLoading ? (
+                <div className="h-7 w-16 rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse mb-1" />
+              ) : (
+                <h4 className="text-2xl font-extrabold text-gray-900 dark:text-white">
+                  {formatCount(analytics?.staffs)}
+                </h4>
+              )}
               <p className="text-xs font-bold text-gray-500 mt-0.5">
                 {t("Staff Personnel")}
               </p>
@@ -88,9 +104,13 @@ export default function SystemWalletHighlightCard() {
           {/* Card 4 */}
           <div className="rounded-2xl border border-gray-100 bg-gray-50/60 p-5 flex items-center justify-between dark:border-gray-800 dark:bg-gray-800/40">
             <div>
-              <h4 className="text-2xl font-extrabold text-gray-900 dark:text-white">
-                {isLoading ? "..." : formatCount(analytics?.buildings)}
-              </h4>
+              {isLoading ? (
+                <div className="h-7 w-16 rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse mb-1" />
+              ) : (
+                <h4 className="text-2xl font-extrabold text-gray-900 dark:text-white">
+                  {formatCount(analytics?.buildings)}
+                </h4>
+              )}
               <p className="text-xs font-bold text-gray-500 mt-0.5">
                 {t("Operational Sites")}
               </p>

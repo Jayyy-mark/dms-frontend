@@ -105,21 +105,26 @@ export default function AuditLogWidget() {
           >
             <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
           </button>
-          <span className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:border-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
-            <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-            {t("Live")}
-          </span>
         </div>
       </div>
 
       {/* ── Body ── */}
       <div className="flex-1 overflow-y-auto px-4 py-3 mb-3">
         {loading && (
-          <div className="flex h-full items-center justify-center">
-            <div className="flex flex-col items-center gap-2 text-gray-400">
-              <RefreshCw className="h-5 w-5 animate-spin" />
-              <p className="text-xs">{t("Loading...")}</p>
-            </div>
+          <div className="space-y-2.5 animate-pulse">
+            {Array.from({ length: 6 }).map((_, idx) => (
+              <div
+                key={`audit-skeleton-${idx}`}
+                className="flex items-start gap-2.5 rounded-xl border border-gray-100 bg-gray-50/60 px-3 py-2.5 dark:border-gray-800 dark:bg-gray-800/40"
+              >
+                <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-gray-200 dark:bg-gray-700" />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <div className="h-3 w-24 rounded bg-gray-200 dark:bg-gray-700" />
+                  <div className="h-2.5 w-40 rounded bg-gray-100 dark:bg-gray-800" />
+                </div>
+                <div className="h-2.5 w-12 rounded bg-gray-100 dark:bg-gray-800 shrink-0" />
+              </div>
+            ))}
           </div>
         )}
 

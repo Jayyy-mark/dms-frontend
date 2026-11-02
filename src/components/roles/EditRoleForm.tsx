@@ -10,6 +10,7 @@ import { toast } from "react-toastify";
 import FieldError from "../form/FieldError.tsx";
 import { useFormErrors } from "../../hooks/useFormErrors.ts";
 import { parseApiError } from "../../helpers/parseApiError.ts";
+import ActionButton from "../ui/button/ActionButton.tsx";
 
 const emptyRole: Role = {
   id: 0,
@@ -86,8 +87,9 @@ export default function EditRoleForm() {
 
         {/* Submit Button */}
         <div className="md:col-span-2 flex">
-          <button
+          <ActionButton
             onClick={handleSubmit}
+            loadingText={`${t("update")}...`}
             className="
               flex items-center gap-2
               px-4 py-2
@@ -102,7 +104,7 @@ export default function EditRoleForm() {
             "
           >
             {t("update")}
-          </button>
+          </ActionButton>
         </div>
 
       </div>

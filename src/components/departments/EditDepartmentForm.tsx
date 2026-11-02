@@ -13,6 +13,7 @@ import Select from "../form/Select.tsx";
 import FieldError from "../form/FieldError.tsx";
 import { useFormErrors } from "../../hooks/useFormErrors.ts";
 import { parseApiError } from "../../helpers/parseApiError.ts";
+import ActionButton from "../ui/button/ActionButton.tsx";
 
 
 const emptyDepartment: Department = {
@@ -118,8 +119,9 @@ export default function EditDepartmentForm() {
         </div>
         {/* Submit Button */}
         <div className="md:col-span-2 flex">
-          <button
+          <ActionButton
             onClick={handleSubmit}
+            loadingText={`${t("update")}...`}
             className="
               flex items-center gap-2
               px-4 py-2
@@ -134,7 +136,7 @@ export default function EditDepartmentForm() {
             "
           >
             {t("update")}
-          </button>
+          </ActionButton>
         </div>
 
       </div>

@@ -14,6 +14,7 @@ import { useSelectOptions } from "../../hooks/useSelectOptions.ts";
 import TextArea from "../form/input/TextArea.tsx";
 import { useFormErrors } from "../../hooks/useFormErrors.ts";
 import { parseApiError } from "../../helpers/parseApiError.ts";
+import ActionButton from "../ui/button/ActionButton";
 
 export default function AddStaffForm() {
   const { t } = useTranslation();
@@ -173,8 +174,9 @@ export default function AddStaffForm() {
                     <FieldError message={errors.staff_address} />
                 </div>         
                 <div className="md:col-span-3 flex">
-                    <button
+                    <ActionButton
                         onClick={handleSubmit}
+                        loadingText={`${t("Create staff")}...`}
                         className="
       flex items-center gap-2 
       px-4 py-2 
@@ -203,7 +205,7 @@ export default function AddStaffForm() {
                             />
                         </svg>
                         {t("Create staff")}
-                    </button>
+                    </ActionButton>
                 </div>
             </div>
         </ComponentCard>

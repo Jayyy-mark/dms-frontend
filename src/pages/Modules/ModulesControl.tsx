@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Search, CheckCircle2, XCircle, RotateCcw, Layers, Loader2 } from "lucide-react";
+import { Search, CheckCircle2, XCircle, RotateCcw, Layers } from "lucide-react";
 import PageMeta from "../../components/common/PageMeta";
 import { DEFAULT_MODULES, MODULE_CHANGE_EVENT, dispatchModuleChange } from "../../utils/moduleManager";
 import { moduleApi } from "../../api/moduleApi";
@@ -168,10 +168,46 @@ export default function ModulesControl() {
 
   if (loading) {
     return (
-      <div className="bg-[#fcfdff] min-h-screen flex items-center justify-center">
-        <div className="flex items-center gap-3 text-gray-500">
-          <Loader2 className="w-6 h-6 animate-spin" />
-          <span className="text-sm font-medium">Loading modules...</span>
+      <div className="bg-[#fcfdff] min-h-screen pb-12 animate-pulse">
+        <div className="px-4 sm:px-8 py-8 max-w-[1400px] mx-auto space-y-6">
+          <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-gray-200" />
+              <div className="space-y-2">
+                <div className="h-5 w-48 rounded bg-gray-200" />
+                <div className="h-3 w-72 rounded bg-gray-100" />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <div className="h-9 w-28 rounded-full bg-gray-200" />
+              <div className="h-9 w-28 rounded-full bg-gray-200" />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+            {Array.from({ length: 3 }).map((_, idx) => (
+              <div key={idx} className="bg-white rounded-3xl p-5 border border-gray-200 shadow-sm flex items-center justify-between">
+                <div className="space-y-2">
+                  <div className="h-3 w-24 rounded bg-gray-200" />
+                  <div className="h-7 w-12 rounded bg-gray-200" />
+                </div>
+                <div className="w-11 h-11 rounded-2xl bg-gray-100" />
+              </div>
+            ))}
+          </div>
+          <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-6 space-y-4">
+            {Array.from({ length: 6 }).map((_, idx) => (
+              <div key={idx} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
+                <div className="space-y-2">
+                  <div className="h-4 w-44 rounded bg-gray-200" />
+                  <div className="h-3 w-28 rounded bg-gray-100" />
+                </div>
+                <div className="h-6 w-20 rounded-full bg-gray-100" />
+                <div className="h-3.5 w-56 rounded bg-gray-100 hidden md:block" />
+                <div className="h-6 w-16 rounded-full bg-gray-100" />
+                <div className="h-7 w-13 rounded-full bg-gray-200" />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );

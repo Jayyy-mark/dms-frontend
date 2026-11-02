@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Link } from "react-router";
 import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "../../icons";
 import Label from "../form/Label";
@@ -8,10 +8,13 @@ import Checkbox from "../form/input/Checkbox";
 import { SignupFormData } from "../../interfaces/auth/SignUpFormData";
 import { authApi } from "../../api/auth/authApi";
 import { useNavigate } from "react-router";
+import { SpinnerIcon } from "../ui/button/ActionButton";
 export default function SignUpForm() {
   const { t } = useTranslation();
   const [showPassword, setShowPassword] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const navigate = useNavigate();
   const [form, setForm] = useState<SignupFormData>({
     username:"",
@@ -30,11 +33,14 @@ export default function SignUpForm() {
 
   const handleSignUp = async(e:React.FormEvent) =>{
     e.preventDefault();
+    if (submittingRef.current) return;
     if(!isChecked){
       alert("You must accept Our Terms & Conditions");
       return;
     }
 
+    submittingRef.current = true;
+    setIsSubmitting(true);
     try{
       const response = await authApi.signUpUser(form);
       alert(response);
@@ -43,6 +49,9 @@ export default function SignUpForm() {
     }catch(error){  
       console.log(error);
       alert("Signup failed!");
+    }finally{
+      submittingRef.current = false;
+      setIsSubmitting(false);
     }
   };
   return (
@@ -197,8 +206,13 @@ export default function SignUpForm() {
                 </div>
                 {/* <!-- Button --> */}
                 <div>
-                  <button className="flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-white transition rounded-lg bg-brand-500 shadow-theme-xs hover:bg-brand-600" onClick={handleSignUp}>
-                    {t("Sign Up")}
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="flex items-center justify-center gap-2 w-full px-4 py-3 text-sm font-medium text-white transition rounded-lg bg-brand-500 shadow-theme-xs hover:bg-brand-600 disabled:opacity-70 disabled:cursor-not-allowed"
+                  >
+                    {isSubmitting && <SpinnerIcon className="h-4 w-4 animate-spin text-white" />}
+                    {isSubmitting ? `${t("Sign Up")}...` : t("Sign Up")}
                   </button>
                 </div>
               </div>

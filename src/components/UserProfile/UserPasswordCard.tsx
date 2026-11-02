@@ -239,6 +239,7 @@ export default function UserPasswordCard() {
                 size="sm"
                 variant="primary"
                 onClick={() => handleSave()}
+                loading={isSubmitting}
                 disabled={isSubmitting}
               >
                 {isSubmitting ? t("Saving...") : t("Save Changes")}

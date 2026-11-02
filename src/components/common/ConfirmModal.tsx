@@ -1,5 +1,6 @@
 import { AlertTriangle, CheckCircle, Info } from "lucide-react";
-import React from "react";
+import React, { useRef, useState } from "react";
+import { SpinnerIcon } from "../ui/button/ActionButton";
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -8,7 +9,8 @@ interface ConfirmModalProps {
   confirmText?: string;
   cancelText?: string;
   type?: "danger" | "primary" | "success" | "info";
-  onConfirm: () => void;
+  isLoading?: boolean;
+  onConfirm: () => unknown | Promise<unknown>;
   onCancel: () => void;
 }
 
@@ -19,9 +21,15 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
   confirmText = "Confirm",
   cancelText = "Cancel",
   type = "danger",
+  isLoading: externalLoading = false,
   onConfirm,
   onCancel,
 }) => {
+  const [internalLoading, setInternalLoading] = useState(false);
+  const busyRef = useRef(false);
+
+  const isBusy = externalLoading || internalLoading;
+
   const styles = {
     danger: {
       iconBg: "bg-red-50 dark:bg-red-900/20",
@@ -51,13 +59,30 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
 
   const t = styles[type];
 
+  const handleConfirmClick = async () => {
+    if (isBusy || busyRef.current) return;
+    busyRef.current = true;
+    setInternalLoading(true);
+    try {
+      await Promise.resolve(onConfirm());
+    } finally {
+      busyRef.current = false;
+      setInternalLoading(false);
+    }
+  };
+
+  const handleCancelClick = () => {
+    if (isBusy || busyRef.current) return;
+    onCancel();
+  };
+
   return (
     <div
       className={`
     fixed inset-0 z-[9999] flex items-center justify-center
     bg-black/40 backdrop-blur-[2px]
     transition-all duration-200
-    ${isOpen ? "opacity-100 visible" : "opacity-0 invisible"}
+    ${isOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"}
   `}
     >
       <div
@@ -74,9 +99,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
 
         {/* HEADER */}
         <div className="flex items-start gap-4 px-6 pt-6">
-          <div className={`p-3 rounded-md ${t.iconBg}`}>
-            {t.icon}
-          </div>
+          <div className={`p-3 rounded-md ${t.iconBg}`}>{t.icon}</div>
 
           <div className="flex-1">
             <h2 className="text-base font-semibold text-gray-900 dark:text-white">
@@ -92,21 +115,26 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
         {/* FOOTER */}
         <div className="flex justify-end gap-3 px-6 py-5 mt-4 border-t border-gray-100 dark:border-gray-800">
           <button
-            onClick={onCancel}
+            type="button"
+            disabled={isBusy}
+            onClick={handleCancelClick}
             className="px-4 py-2 text-sm rounded-md border border-gray-300
                    text-gray-700 hover:bg-gray-50
                    dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800
-                   transition"
+                   transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {cancelText}
           </button>
 
           <button
-            onClick={onConfirm}
-            className={`px-4 py-2 text-sm rounded-md text-white
-                    focus:outline-none focus:ring-2 ${t.btn}`}
+            type="button"
+            disabled={isBusy}
+            onClick={handleConfirmClick}
+            className={`inline-flex items-center gap-2 px-4 py-2 text-sm rounded-md text-white
+                    focus:outline-none focus:ring-2 transition disabled:opacity-65 disabled:cursor-not-allowed ${t.btn}`}
           >
-            {confirmText}
+            {isBusy && <SpinnerIcon className="h-4 w-4 text-white" />}
+            <span>{confirmText}</span>
           </button>
         </div>
       </div>

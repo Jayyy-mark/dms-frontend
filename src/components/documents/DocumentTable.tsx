@@ -5,11 +5,13 @@ import { Document, DocumentSearch } from "../../interfaces/document";
 import { documentApi } from "../../api/documentApi";
 import { categoryApi } from "../../api/categoryApi";
 import { Category } from "../../interfaces/category";
-import { useDocuments } from "../../hooks/useDocuments";
+import { usePaginatedDocuments, DocumentStats } from "../../hooks/useDocuments";
+import ServerPaginationBar from "../common/ServerPaginationBar";
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
 import ConfirmModal from "../common/ConfirmModal";
+import ActionButton from "../ui/button/ActionButton";
 import { helper } from "../../helpers/utils";
 import { API_SERVER } from "../../helpers/api";
 import FilterModal from "../locations/FilterModal";
@@ -21,8 +23,6 @@ import {
     Trash2,
     Eye,
     ArchiveIcon,
-    ChevronLeft,
-    ChevronRight,
     Search,
     ChevronDown,
     LayoutGrid,
@@ -44,8 +44,9 @@ interface DocumentTableProps {
     documents?: Document[];
     setDocuments?: React.Dispatch<React.SetStateAction<Document[]>>;
     searchRef?: React.MutableRefObject<any>;
-    onSearch?: (data: DocumentSearch) => void;
-    onClearSearch?: () => void;
+    onSearch?: (data: DocumentSearch) => void | Promise<unknown>;
+    onClearSearch?: () => void | Promise<unknown>;
+    onStatsChange?: (stats: DocumentStats | undefined, isLoading: boolean) => void;
     isLoading?: boolean;
     mutate?: () => void;
 }
@@ -56,25 +57,12 @@ export default function DocumentTable({
     searchRef,
     onSearch,
     onClearSearch,
+    onStatsChange,
+    isLoading: propIsLoading,
     mutate: propMutate,
 }: DocumentTableProps = {}) {
     const { t } = useTranslation();
     const navigate = useNavigate();
-
-    const swr = useDocuments();
-    const [localDocuments, setLocalDocuments] = useState<Document[]>([]);
-
-    useEffect(() => {
-        if (propDocuments !== undefined) {
-            setLocalDocuments(propDocuments);
-        } else if (swr.documents) {
-            setLocalDocuments(swr.documents);
-        }
-    }, [propDocuments, swr.documents]);
-
-    const documents = propDocuments !== undefined ? propDocuments : localDocuments;
-    const setDocuments = propSetDocuments || setLocalDocuments;
-    const mutate = propMutate || swr.mutate;
 
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<Document | null>(null);
@@ -85,9 +73,11 @@ export default function DocumentTable({
     const btnRefs = useRef<Record<number, HTMLButtonElement | null>>({});
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [snapshotId, setSnapshotId] = useState<number | undefined>(undefined);
 
     // Filter States
     const [searchQuery, setSearchQuery] = useState("");
+    const [advSearchFilters, setAdvSearchFilters] = useState<Partial<DocumentSearch>>({});
     const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
     const [tempSelectedCategories, setTempSelectedCategories] = useState<number[]>([]);
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -100,6 +90,48 @@ export default function DocumentTable({
     // Drawer Filter state (persistent until cleared)
     const [drawerFilterState, setDrawerFilterState] = useState<FilterState>(initialFilterState);
     const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+
+    const activeCatIds = drawerFilterState.categoryIds.length > 0 ? drawerFilterState.categoryIds : selectedCategories;
+    const requestedOffset = (currentPage - 1) * itemsPerPage;
+
+    const swr = usePaginatedDocuments({
+        ...advSearchFilters,
+        limit: itemsPerPage,
+        offset: requestedOffset,
+        tab: activeTab,
+        search: searchQuery.trim() || undefined,
+        categories: activeCatIds.length > 0 ? activeCatIds.join(",") : undefined,
+        staff_ids: drawerFilterState.staffIds.length > 0 ? drawerFilterState.staffIds.join(",") : undefined,
+        doc_types: drawerFilterState.docTypes.length > 0 ? drawerFilterState.docTypes.join(",") : undefined,
+        statuses: drawerFilterState.statuses.length > 0 ? drawerFilterState.statuses.join(",") : undefined,
+        sort_by: drawerFilterState.sortBy !== "recent" ? drawerFilterState.sortBy : undefined,
+        snapshot_id: currentPage > 1 ? snapshotId : undefined,
+    });
+
+    const isLoading = propIsLoading !== undefined ? propIsLoading : swr.isLoading;
+    const [localDocuments, setLocalDocuments] = useState<Document[]>([]);
+
+    useEffect(() => {
+        if (propDocuments !== undefined) {
+            setLocalDocuments(propDocuments);
+        } else if (swr.documents) {
+            setLocalDocuments(swr.documents);
+        }
+    }, [propDocuments, swr.documents]);
+
+    useEffect(() => {
+        if (currentPage === 1 && swr.pagination?.snapshot_id) {
+            setSnapshotId(swr.pagination.snapshot_id);
+        }
+    }, [currentPage, swr.pagination?.snapshot_id]);
+
+    useEffect(() => {
+        onStatsChange?.(swr.stats, isLoading);
+    }, [swr.stats, isLoading]);
+
+    const documents = propDocuments !== undefined ? propDocuments : localDocuments;
+    const setDocuments = propSetDocuments || setLocalDocuments;
+    const mutate = propMutate || swr.mutate;
 
     const hasActiveDrawerFilters =
         drawerFilterState.sortBy !== "recent" ||
@@ -230,23 +262,24 @@ export default function DocumentTable({
         setOpenDropdownId(null);
     }
 
-    const handleSearchSubmit = (data: DocumentSearch) => {
-        // Check if any filter is actually active
+    const handleSearchSubmit = async (data: DocumentSearch) => {
         const isActive = Object.values(data).some(val => val !== null && val !== "");
         setHasActiveFilters(isActive);
-
-        if (onSearch) onSearch(data);
+        setAdvSearchFilters(helper.cleanSearchParams(data));
+        if (onSearch) await onSearch(data);
         setIsFilterModalOpen(false);
         setCurrentPage(1);
+        setSnapshotId(undefined);
     };
 
-    const handleClear = () => {
+    const handleClear = async () => {
         setHasActiveFilters(false);
-        if (onClearSearch) onClearSearch();
+        setAdvSearchFilters({});
+        if (onClearSearch) await onClearSearch();
         setIsFilterModalOpen(false);
         setCurrentPage(1);
+        setSnapshotId(undefined);
     };
-
 
     const renderCategoryPath = (cat: any) => {
         const parts = [];
@@ -266,80 +299,25 @@ export default function DocumentTable({
         return 'permanent';
     };
 
-    // Filter & Sort Logic (Evaluating persistent Drawer Filter State)
-    let filteredDocs = documents.filter(doc => {
-        // Tab filter
-        const status = getDocStatus(doc);
-        if (activeTab !== 'all' && status !== activeTab) return false;
-
-        // Category filter (combines top category modal and drawer category tree)
-        const activeCatIds = drawerFilterState.categoryIds.length > 0 ? drawerFilterState.categoryIds : selectedCategories;
-        if (activeCatIds.length > 0) {
-            if (!doc.category?.id || !activeCatIds.includes(doc.category.id)) {
-                return false;
-            }
-        }
-
-        // Document Type filter (permanent / temporary)
-        if (drawerFilterState.docTypes.length > 0) {
-            if (!drawerFilterState.docTypes.includes(status)) return false;
-        }
-
-        // Status filter (active / expired)
-        if (drawerFilterState.statuses.length > 0) {
-            if (drawerFilterState.statuses.includes("active") && status === "expired") return false;
-            if (drawerFilterState.statuses.includes("expired") && status !== "expired") return false;
-        }
-
-        // Staff Member filter
-        if (drawerFilterState.staffIds.length > 0) {
-            const staffIdStr = String(doc.staff?.id || doc.staff_id || "");
-            if (!drawerFilterState.staffIds.includes(staffIdStr)) return false;
-        }
-
-        // Search filter
-        if (searchQuery) {
-            const query = searchQuery.toLowerCase();
-            if (!doc.document_name?.toLowerCase().includes(query) && !doc.staff?.staff_name?.toLowerCase().includes(query)) {
-                return false;
-            }
-        }
-
-        return true;
-    });
-
-    // Apply Sorting
-    if (drawerFilterState.sortBy === "older") {
-        filteredDocs = [...filteredDocs].sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
-    } else if (drawerFilterState.sortBy === "alphabetical") {
-        filteredDocs = [...filteredDocs].sort((a, b) => (a.document_name || "").localeCompare(b.document_name || ""));
-    } else if (drawerFilterState.sortBy === "recent") {
-        filteredDocs = [...filteredDocs].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-    }
-
-    // Calculate stats for tabs
-    const stats = {
-        all: documents.length,
-        permanent: documents.filter(d => getDocStatus(d) === 'permanent').length,
-        temporary: documents.filter(d => getDocStatus(d) === 'temporary').length,
-        expired: documents.filter(d => getDocStatus(d) === 'expired').length,
+    // Server-side DB-level stats & pagination
+    const stats = swr.stats || {
+        all: 0,
+        permanent: 0,
+        temporary: 0,
+        expired: 0,
     };
 
-    // Pagination logic
-    const totalPages = Math.max(1, Math.ceil(filteredDocs.length / itemsPerPage));
-    const currentDocuments = filteredDocs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+    const totalEntries = swr.pagination?.total ?? documents.length;
+    const totalPages = Math.max(1, swr.pagination?.total_pages ?? 1);
+    const currentDocuments = documents;
+    const filteredDocs = documents;
+    const isCurrentPageData =
+        swr.pagination?.offset === requestedOffset && swr.pagination?.limit === itemsPerPage;
+    const isPageLoading = swr.isValidating && !isCurrentPageData;
 
     // Checkbox helpers (declared after currentDocuments)
     const isAllSelected = currentDocuments.length > 0 && currentDocuments.every(d => selectedIds.has(d.id));
     const isIndeterminate = !isAllSelected && currentDocuments.some(d => selectedIds.has(d.id));
-
-    const handlePreviousPage = () => {
-        if (currentPage > 1) setCurrentPage(currentPage - 1);
-    };
-
-    const handleNextPage = () => {
-        if (currentPage < totalPages) setCurrentPage(currentPage + 1);
-    };
 
     // const getAvatarColor = (name: string) => {
     //     const colors = ['bg-red-100 text-red-600', 'bg-blue-100 text-[#997524]', 'bg-emerald-100 text-emerald-600', 'bg-purple-100 text-purple-600', 'bg-amber-100 text-amber-600'];
@@ -402,7 +380,7 @@ export default function DocumentTable({
                     const subChildren = allCategories.filter(c => c.parent_id === child.id?.toString() || c.parent?.id === child.id);
                     return (
                         <li key={child.id}>
-                            <button
+                            <ActionButton
                                 onClick={() => {
                                     if (isSelected) {
                                         setTempSelectedCategories(prev => prev.filter(id => id !== child.id));
@@ -416,7 +394,7 @@ export default function DocumentTable({
                                     }`}
                             >
                                 {child.category_name}
-                            </button>
+                            </ActionButton>
                             {subChildren.length > 0 && renderCategoryTree(subChildren, level + 1)}
                         </li>
                     );
@@ -447,40 +425,40 @@ export default function DocumentTable({
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-3 pt-2 pb-1">
                     {/* Status tabs */}
                     <div className="flex flex-wrap items-center gap-2">
-                        <button
+                        <ActionButton
                             onClick={() => { setActiveTab('all'); setCurrentPage(1); }}
                             className={`px-4 py-1.5 rounded-full text-[13px] font-semibold transition-all flex items-center gap-1.5 ${activeTab === 'all' ? 'bg-[#B88E2F] text-white shadow-sm border border-[#B88E2F]' : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-300 hover:text-gray-700'}`}
                         >
                             All <span className={`text-[12px] font-bold ${activeTab === 'all' ? 'text-white/90' : 'text-gray-400'}`}>{stats.all}</span>
-                        </button>
-                        <button
+                        </ActionButton>
+                        <ActionButton
                             onClick={() => { setActiveTab('permanent'); setCurrentPage(1); }}
                             className={`px-4 py-1.5 rounded-full text-[13px] font-semibold transition-all flex items-center gap-1.5 ${activeTab === 'permanent' ? 'bg-[#B88E2F] text-white shadow-sm border border-[#B88E2F]' : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-300 hover:text-gray-700'}`}
                         >
                             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${activeTab === 'permanent' ? 'bg-white' : 'bg-[#22c55e]'}`}></span>
                             Permanent <span className={`text-[12px] font-bold ${activeTab === 'permanent' ? 'text-white/90' : 'text-gray-400'}`}>{stats.permanent}</span>
-                        </button>
-                        <button
+                        </ActionButton>
+                        <ActionButton
                             onClick={() => { setActiveTab('temporary'); setCurrentPage(1); }}
                             className={`px-4 py-1.5 rounded-full text-[13px] font-semibold transition-all flex items-center gap-1.5 ${activeTab === 'temporary' ? 'bg-[#B88E2F] text-white shadow-sm border border-[#B88E2F]' : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-300 hover:text-gray-700'}`}
                         >
                             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${activeTab === 'temporary' ? 'bg-white' : 'bg-[#3b82f6]'}`}></span>
                             Temporary <span className={`text-[12px] font-bold ${activeTab === 'temporary' ? 'text-white/90' : 'text-gray-400'}`}>{stats.temporary}</span>
-                        </button>
-                        <button
+                        </ActionButton>
+                        <ActionButton
                             onClick={() => { setActiveTab('expired'); setCurrentPage(1); }}
                             className={`px-4 py-1.5 rounded-full text-[13px] font-semibold transition-all flex items-center gap-1.5 ${activeTab === 'expired' ? 'bg-[#B88E2F] text-white shadow-sm border border-[#B88E2F]' : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-300 hover:text-gray-700'}`}
                         >
                             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${activeTab === 'expired' ? 'bg-white' : 'bg-[#ef4444]'}`}></span>
                             Expired <span className={`text-[12px] font-bold ${activeTab === 'expired' ? 'text-white/90' : 'text-gray-400'}`}>{stats.expired}</span>
-                        </button>
+                        </ActionButton>
                     </div>
 
                     {/* Right side: filter buttons + count + view toggle */}
                     <div className="flex items-center gap-2 shrink-0">
                         {/* Categories filter */}
                         <div className="relative">
-                            <button
+                            <ActionButton
                                 onClick={openCategoryModal}
                                 className={`flex items-center gap-1.5 border rounded-full px-4 py-1.5 text-[13px] font-semibold outline-none cursor-pointer transition-all ${selectedCategories.length > 0
                                     ? 'bg-[#FEF3C7] border-blue-300 text-amber-700'
@@ -490,7 +468,7 @@ export default function DocumentTable({
                                 All categories
                                 {selectedCategories.length > 0 && <span className="bg-[#B88E2F] text-white px-1.5 py-0.5 rounded-full text-[10px] font-bold">{selectedCategories.length}</span>}
                                 <ChevronDown size={13} className={selectedCategories.length > 0 ? 'text-blue-400' : 'text-gray-400'} />
-                            </button>
+                            </ActionButton>
 
                             {isCategoryModalOpen && (
                                 <div className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh] px-4 sm:px-6">
@@ -500,7 +478,7 @@ export default function DocumentTable({
                                         <div className="flex justify-between items-center px-8 py-5 border-b border-gray-100 shrink-0">
                                             <h3 className="text-lg font-bold text-gray-900">Select Categories</h3>
                                             <div className="flex items-center gap-3">
-                                                <button
+                                                <ActionButton
                                                     onClick={() => {
                                                         setSelectedCategories([]);
                                                         setTempSelectedCategories([]);
@@ -513,20 +491,20 @@ export default function DocumentTable({
                                                         }`}
                                                 >
                                                     Remove Filter
-                                                </button>
-                                                <button
+                                                </ActionButton>
+                                                <ActionButton
                                                     onClick={handleApplyCategories}
                                                     className="px-5 py-2 text-sm font-bold text-white bg-[#B88E2F] hover:bg-[#997524] rounded-lg transition-colors shadow-sm flex items-center gap-2"
                                                 >
                                                     <Search size={15} /> Search
-                                                </button>
+                                                </ActionButton>
                                                 <div className="h-6 w-px bg-gray-200 mx-1"></div>
-                                                <button
+                                                <ActionButton
                                                     onClick={() => setIsCategoryModalOpen(false)}
                                                     className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
                                                 >
                                                     <X size={20} />
-                                                </button>
+                                                </ActionButton>
                                             </div>
                                         </div>
 
@@ -559,7 +537,7 @@ export default function DocumentTable({
                         </div>
 
                         {/* Filter Button */}
-                        <button
+                        <ActionButton
                             onClick={() => setIsFilterDrawerOpen(true)}
                             className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all shadow-sm ${hasActiveDrawerFilters
                                 ? 'bg-[#997524] text-white border border-[#80611d]'
@@ -574,29 +552,29 @@ export default function DocumentTable({
                                     <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
                                 </span>
                             )}
-                        </button>
+                        </ActionButton>
 
                         <div className="h-5 w-px bg-gray-200 mx-1"></div>
 
                         {/* Count */}
                         <span className="text-[13px] font-bold text-gray-500">
-                            {filteredDocs.length > 0 ? ((currentPage - 1) * itemsPerPage) + 1 : 0} of {filteredDocs.length}
+                            {totalEntries > 0 ? ((currentPage - 1) * itemsPerPage) + 1 : 0}–{Math.min((currentPage - 1) * itemsPerPage + currentDocuments.length, totalEntries)} of {totalEntries.toLocaleString()}
                         </span>
 
                         {/* View toggle */}
                         <div className="flex items-center bg-gray-50 rounded-lg p-1 border border-gray-200">
-                            <button
+                            <ActionButton
                                 onClick={() => setViewMode("list")}
                                 className={`p-1 rounded transition-colors ${viewMode === 'list' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-400 hover:text-gray-800 bg-transparent'}`}
                             >
                                 <List size={15} />
-                            </button>
-                            <button
+                            </ActionButton>
+                            <ActionButton
                                 onClick={() => setViewMode("grid")}
                                 className={`p-1 rounded transition-colors ${viewMode === 'grid' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-400 hover:text-gray-800 bg-transparent'}`}
                             >
                                 <LayoutGrid size={15} />
-                            </button>
+                            </ActionButton>
                         </div>
                     </div>
                 </div>
@@ -605,6 +583,11 @@ export default function DocumentTable({
             {/* Content View */}
             {viewMode === "list" ? (
                 <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                    {isPageLoading && (
+                        <div className="h-0.5 w-full bg-[#B88E2F]/20 overflow-hidden">
+                            <div className="h-full w-1/3 bg-[#B88E2F] animate-pulse" />
+                        </div>
+                    )}
                     <div className="overflow-x-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: '#cbd5e1 transparent' }}>
                         <table className="w-full min-w-[750px] text-left border-collapse">
                             <thead>
@@ -626,8 +609,33 @@ export default function DocumentTable({
                                     <th className="px-6 py-4"></th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {currentDocuments.map((doc) => {
+                            <tbody className={`divide-y divide-gray-100 transition-opacity ${isPageLoading ? "opacity-60" : ""}`}>
+                                {isLoading ? (
+                                    Array.from({ length: 8 }).map((_, idx) => (
+                                        <tr key={`doc-skel-row-${idx}`} className="animate-pulse">
+                                            <td className="px-6 py-4"><div className="w-4 h-4 rounded bg-gray-200" /></td>
+                                            <td className="px-6 py-4 min-w-[250px]">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-9 h-9 rounded-lg bg-gray-200 shrink-0" />
+                                                    <div className="space-y-1.5">
+                                                        <div className="h-3.5 w-36 rounded bg-gray-200" />
+                                                        <div className="h-2.5 w-24 rounded bg-gray-100" />
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4"><div className="h-3.5 w-28 rounded bg-gray-200" /></td>
+                                            <td className="px-6 py-4"><div className="h-5 w-20 rounded-full bg-gray-100" /></td>
+                                            <td className="px-6 py-4">
+                                                <div className="space-y-1.5">
+                                                    <div className="h-3.5 w-24 rounded bg-gray-200" />
+                                                    <div className="h-2.5 w-20 rounded bg-gray-100" />
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4"><div className="h-3.5 w-20 rounded bg-gray-200" /></td>
+                                            <td className="px-6 py-4 text-right"><div className="w-7 h-7 rounded-md bg-gray-100 ml-auto" /></td>
+                                        </tr>
+                                    ))
+                                ) : currentDocuments.map((doc) => {
                                     const status = getDocStatus(doc);
                                     const fileIcon = getFileIcon(doc);
 
@@ -679,19 +687,19 @@ export default function DocumentTable({
                                                 {helper.formatStrDate(doc.updated_at || doc.created_at || "")}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-right" onClick={e => e.stopPropagation()}>
-                                                <button
+                                                <ActionButton
                                                     ref={el => { btnRefs.current[doc.id] = el; }}
                                                     onClick={(e) => toggleDropdown(doc.id, e)}
                                                     className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
                                                 >
                                                     <MoreHorizontal size={18} />
-                                                </button>
+                                                </ActionButton>
                                             </td>
                                         </tr>
                                     );
                                 })}
 
-                                {filteredDocs.length === 0 && (
+                                {!isLoading && filteredDocs.length === 0 && (
                                     <tr>
                                         <td colSpan={7} className="px-6 py-12 text-center text-[13px] font-bold text-gray-400">
                                             No documents found.
@@ -705,7 +713,30 @@ export default function DocumentTable({
 
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {currentDocuments.map((doc) => {
+                    {isLoading ? (
+                        Array.from({ length: 6 }).map((_, idx) => (
+                            <div
+                                key={`doc-skel-card-${idx}`}
+                                className="bg-white rounded-[1.25rem] border border-gray-100 shadow-xs p-6 animate-pulse space-y-4"
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-xl bg-gray-200 shrink-0" />
+                                    <div className="space-y-2 flex-1">
+                                        <div className="h-4 w-36 rounded bg-gray-200" />
+                                        <div className="h-3 w-24 rounded bg-gray-100" />
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <div className="h-5 w-20 rounded-full bg-gray-100" />
+                                    <div className="h-5 w-16 rounded-full bg-gray-100" />
+                                </div>
+                                <div className="space-y-2 pt-1">
+                                    <div className="h-3 w-28 rounded bg-gray-200" />
+                                    <div className="h-3 w-24 rounded bg-gray-100" />
+                                </div>
+                            </div>
+                        ))
+                    ) : currentDocuments.map((doc) => {
                         const status = getDocStatus(doc);
                         const fileIcon = getFileIcon(doc, 20);
                         const categoryPath = renderCategoryPath(doc.category) || "-";
@@ -736,44 +767,44 @@ export default function DocumentTable({
                                         <Star className="text-amber-400 fill-amber-400" size={16} />
 
                                         <div className="relative inline-block mt-1">
-                                            <button
+                                            <ActionButton
                                                 onClick={(e) => toggleDropdown(doc.id, e)}
                                                 className="p-1 rounded-md text-gray-400 hover:text-gray-800 hover:bg-gray-100 transition-colors"
                                             >
                                                 <MoreHorizontal size={16} />
-                                            </button>
+                                            </ActionButton>
 
                                             {openDropdownId === doc.id && (
                                                 <>
                                                     <div className="fixed inset-0 z-10" onClick={() => setOpenDropdownId(null)}></div>
                                                     <div className="absolute right-0 mt-1 w-40 bg-white rounded-xl shadow-[0_5px_15px_-3px_rgba(0,0,0,0.1)] border border-gray-100 z-20 py-2 animate-in fade-in zoom-in-95 duration-100">
-                                                        <button
+                                                        <ActionButton
                                                             onClick={() => { window.open(`${API_SERVER}${doc.document}`); setOpenDropdownId(null); }}
                                                             className="w-full text-left px-4 py-2 text-[13px] font-semibold text-gray-700 hover:bg-gray-50 hover:text-[#B88E2F] flex items-center transition-colors"
                                                         >
                                                             <Eye size={15} className="mr-2" /> View
-                                                        </button>
-                                                        <button
+                                                        </ActionButton>
+                                                        <ActionButton
                                                             onClick={() => handleEditDocument(doc)}
                                                             className="w-full text-left px-4 py-2 text-[13px] font-semibold text-gray-700 hover:bg-gray-50 hover:text-[#B88E2F] flex items-center transition-colors"
                                                         >
                                                             <Pencil size={15} className="mr-2" /> Edit
-                                                        </button>
+                                                        </ActionButton>
                                                         {status !== "temporary" && (
-                                                            <button
+                                                            <ActionButton
                                                                 onClick={() => handleArchiveDocument(doc)}
                                                                 className="w-full text-left px-4 py-2 text-[13px] font-semibold text-gray-700 hover:bg-gray-50 hover:text-[#B88E2F] flex items-center transition-colors"
                                                             >
                                                                 <ArchiveIcon size={15} className="mr-2" /> Archive
-                                                            </button>
+                                                            </ActionButton>
                                                         )}
                                                         <div className="h-px bg-gray-100 my-1"></div>
-                                                        <button
+                                                        <ActionButton
                                                             onClick={() => handleDeleteClick(doc)}
                                                             className="w-full text-left px-4 py-2 text-[13px] font-semibold text-red-600 hover:bg-red-50 flex items-center transition-colors"
                                                         >
                                                             <Trash2 size={15} className="mr-2" /> Delete
-                                                        </button>
+                                                        </ActionButton>
                                                     </div>
                                                 </>
                                             )}
@@ -807,7 +838,7 @@ export default function DocumentTable({
                         );
                     })}
 
-                    {filteredDocs.length === 0 && (
+                    {!isLoading && filteredDocs.length === 0 && (
                         <div className="col-span-full py-12 text-center text-[13px] font-bold text-gray-400 bg-white rounded-xl border border-gray-100">
                             No documents found.
                         </div>
@@ -827,7 +858,7 @@ export default function DocumentTable({
                             className="fixed z-50 w-44 bg-white rounded-xl shadow-[0_8px_24px_-4px_rgba(0,0,0,0.15)] border border-gray-100 py-1.5"
                             style={{ top: dropdownPos.top, right: dropdownPos.right }}
                         >
-                            <button
+                            <ActionButton
                                 onClick={() => { window.open(`${API_SERVER}${doc.document}`); setOpenDropdownId(null); setDropdownPos(null); }}
                                 className="w-full text-left px-4 py-2.5 text-[13px] font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors group/item"
                             >
@@ -835,8 +866,8 @@ export default function DocumentTable({
                                     <Eye size={14} className="text-[#B88E2F]" />
                                 </div>
                                 View
-                            </button>
-                            <button
+                            </ActionButton>
+                            <ActionButton
                                 onClick={() => handleEditDocument(doc)}
                                 className="w-full text-left px-4 py-2.5 text-[13px] font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors group/item"
                             >
@@ -844,9 +875,9 @@ export default function DocumentTable({
                                     <Pencil size={14} className="text-gray-500" />
                                 </div>
                                 Edit
-                            </button>
+                            </ActionButton>
                             {status !== "temporary" && (
-                                <button
+                                <ActionButton
                                     onClick={() => handleArchiveDocument(doc)}
                                     className="w-full text-left px-4 py-2.5 text-[13px] font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors group/item"
                                 >
@@ -854,10 +885,10 @@ export default function DocumentTable({
                                         <ArchiveIcon size={14} className="text-amber-500" />
                                     </div>
                                     Archive
-                                </button>
+                                </ActionButton>
                             )}
                             <div className="h-px bg-gray-100 my-1 mx-3"></div>
-                            <button
+                            <ActionButton
                                 onClick={() => handleDeleteClick(doc)}
                                 className="w-full text-left px-4 py-2.5 text-[13px] font-semibold text-red-500 hover:bg-red-50 flex items-center gap-3 transition-colors group/item"
                             >
@@ -865,64 +896,28 @@ export default function DocumentTable({
                                     <Trash2 size={14} className="text-red-500" />
                                 </div>
                                 Delete
-                            </button>
+                            </ActionButton>
                         </div>
                     </>
                 );
             })()}
 
             {/* Pagination Controls */}
-            {filteredDocs.length > 0 && (
-                <div className="flex flex-col sm:flex-row items-center justify-between bg-white dark:bg-white/[0.03] px-4 py-3 sm:px-6 rounded-xl border border-gray-200 dark:border-gray-800 mt-4 shadow-sm gap-4 sm:gap-0">
-
-                    <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
-                        <div className="flex items-center gap-2">
-                            <span className="text-sm text-gray-700 dark:text-gray-300">Rows per page:</span>
-                            <select
-                                value={itemsPerPage}
-                                onChange={(e) => {
-                                    setItemsPerPage(Number(e.target.value));
-                                    setCurrentPage(1);
-                                }}
-                                className="border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-md text-sm py-1 px-2 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-[#B88E2F] cursor-pointer"
-                            >
-                                <option value={10}>10</option>
-                                <option value={25}>25</option>
-                                <option value={50}>50</option>
-                                <option value={100}>100</option>
-                            </select>
-                        </div>
-                        <p className="text-sm text-gray-700 dark:text-gray-300 hidden sm:block">
-                            Showing <span className="font-medium">{((currentPage - 1) * itemsPerPage) + 1}</span> to <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredDocs.length)}</span> of <span className="font-medium">{filteredDocs.length}</span> documents
-                        </p>
-                    </div>
-
-                    <div className="flex items-center justify-between w-full sm:w-auto">
-                        <p className="text-sm text-gray-700 dark:text-gray-300 block sm:hidden">
-                            <span className="font-medium">{((currentPage - 1) * itemsPerPage) + 1}</span> - <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredDocs.length)}</span> of <span className="font-medium">{filteredDocs.length}</span>
-                        </p>
-
-                        <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
-                            <button
-                                onClick={handlePreviousPage}
-                                disabled={currentPage === 1}
-                                className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 dark:ring-gray-700 dark:hover:bg-gray-800 transition-colors"
-                            >
-                                <span className="sr-only">Previous</span>
-                                <ChevronLeft className="h-5 w-5" aria-hidden="true" />
-                            </button>
-                            <button
-                                onClick={handleNextPage}
-                                disabled={currentPage === totalPages || totalPages === 0}
-                                className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 dark:ring-gray-700 dark:hover:bg-gray-800 transition-colors"
-                            >
-                                <span className="sr-only">Next</span>
-                                <ChevronRight className="h-5 w-5" aria-hidden="true" />
-                            </button>
-                        </nav>
-                    </div>
-
-                </div>
+            {!isLoading && totalEntries > 0 && (
+                <ServerPaginationBar
+                    currentPage={currentPage}
+                    itemsPerPage={itemsPerPage}
+                    totalEntries={totalEntries}
+                    totalPages={totalPages}
+                    remainingEntries={swr.pagination?.remaining}
+                    remainingPages={swr.pagination?.remaining_pages}
+                    currentCount={currentDocuments.length}
+                    onPageChange={(page) => setCurrentPage(page)}
+                    onItemsPerPageChange={(limit) => {
+                        setItemsPerPage(limit);
+                        setCurrentPage(1);
+                    }}
+                />
             )}
 
             <ConfirmModal
@@ -955,19 +950,19 @@ export default function DocumentTable({
                         {selectedIds.size} selected
                     </span>
                     <div className="h-5 w-px bg-gray-200"></div>
-                    <button
+                    <ActionButton
                         onClick={() => setSelectedIds(new Set())}
                         className="text-[13px] font-semibold text-gray-500 hover:text-gray-800 transition-colors"
                     >
                         Clear
-                    </button>
-                    <button
+                    </ActionButton>
+                    <ActionButton
                         onClick={() => setBulkDeleteOpen(true)}
                         className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white text-[13px] font-bold px-4 py-2 rounded-xl transition-colors shadow-sm"
                     >
                         <Trash2 size={14} />
                         Delete
-                    </button>
+                    </ActionButton>
                 </div>
             )}
 
@@ -986,18 +981,18 @@ export default function DocumentTable({
                             <h2 className="text-[18px] font-extrabold text-gray-900 mb-2">Delete {selectedIds.size} document{selectedIds.size > 1 ? 's' : ''}?</h2>
                             <p className="text-[13px] text-gray-500 font-medium mb-8">These documents will be permanently removed. This can't be undone.</p>
                             <div className="flex gap-3 w-full">
-                                <button
+                                <ActionButton
                                     onClick={() => setBulkDeleteOpen(false)}
                                     className="flex-1 py-2.5 rounded-xl border border-gray-200 text-[13px] font-bold text-gray-700 hover:bg-gray-50 transition-colors"
                                 >
                                     Cancel
-                                </button>
-                                <button
+                                </ActionButton>
+                                <ActionButton
                                     onClick={confirmBulkDelete}
                                     className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-[13px] font-bold transition-colors shadow-sm"
                                 >
                                     Delete
-                                </button>
+                                </ActionButton>
                             </div>
                         </div>
                     </div>
@@ -1017,9 +1012,9 @@ export default function DocumentTable({
                             {/* Panel header */}
                             <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
                                 <span className="text-[15px] font-extrabold text-gray-900">Document Details</span>
-                                <button onClick={() => setDetailDoc(null)} className="p-2 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
+                                <ActionButton onClick={() => setDetailDoc(null)} className="p-2 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
                                     <X size={18} />
-                                </button>
+                                </ActionButton>
                             </div>
 
                             {/* Scrollable body */}
@@ -1103,24 +1098,24 @@ export default function DocumentTable({
 
                             {/* Action footer */}
                             <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
-                                <button
+                                <ActionButton
                                     onClick={() => window.open(`${API_SERVER}${detailDoc.document}`)}
                                     className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-gray-200 text-[13px] font-bold text-gray-700 hover:bg-gray-50 transition-colors"
                                 >
                                     <Eye size={15} /> View File
-                                </button>
-                                <button
+                                </ActionButton>
+                                <ActionButton
                                     onClick={() => { handleEditDocument(detailDoc); setDetailDoc(null); }}
                                     className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-gray-200 text-[13px] font-bold text-gray-700 hover:bg-gray-50 transition-colors"
                                 >
                                     <Pencil size={15} /> Edit
-                                </button>
-                                <button
+                                </ActionButton>
+                                <ActionButton
                                     onClick={() => { handleDeleteClick(detailDoc); setDetailDoc(null); }}
                                     className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-[13px] font-bold transition-colors"
                                 >
                                     <Trash2 size={15} /> Delete
-                                </button>
+                                </ActionButton>
                             </div>
                         </div>
                     </>

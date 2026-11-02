@@ -105,7 +105,71 @@ export const dashboardApi = {
         const res = await api.get("dashboard/category-summary/", { params });
         return res.data;
     },
+    async globalSearch(q: string, limit = 5, signal?: AbortSignal): Promise<GlobalSearchResponse> {
+        const clean = q.trim();
+        if (!clean) {
+            return EMPTY_GLOBAL_SEARCH;
+        }
+        const cacheKey = `${clean.toLowerCase()}:${limit}`;
+        const cached = globalSearchCache.get(cacheKey);
+        if (cached && Date.now() - cached.ts < 30_000) {
+            return cached.data;
+        }
+        const res = await api.get("dashboard/global-search/", {
+            params: { q: clean, limit },
+            signal,
+        });
+        const data: GlobalSearchResponse = res.data;
+        if (globalSearchCache.size > 60) {
+            const firstKey = globalSearchCache.keys().next().value;
+            if (firstKey) globalSearchCache.delete(firstKey);
+        }
+        globalSearchCache.set(cacheKey, { ts: Date.now(), data });
+        return data;
+    },
 };
+
+export interface GlobalSearchResultItem {
+    id: number;
+    code: string;
+    title: string;
+    subtitle: string;
+    status?: "active" | "archived" | "recycled";
+    file_url?: string | null;
+    url: string;
+    type: "document" | "location" | "staff" | "department" | "category" | "building" | "room" | "user";
+}
+
+export interface GlobalSearchResponse {
+    query: string;
+    total: number;
+    results: {
+        documents: GlobalSearchResultItem[];
+        locations: GlobalSearchResultItem[];
+        staffs: GlobalSearchResultItem[];
+        departments: GlobalSearchResultItem[];
+        categories: GlobalSearchResultItem[];
+        facilities: GlobalSearchResultItem[];
+        users: GlobalSearchResultItem[];
+    };
+}
+
+const EMPTY_GLOBAL_SEARCH: GlobalSearchResponse = {
+    query: "",
+    total: 0,
+    results: {
+        documents: [],
+        locations: [],
+        staffs: [],
+        departments: [],
+        categories: [],
+        facilities: [],
+        users: [],
+    },
+};
+
+const globalSearchCache = new Map<string, { ts: number; data: GlobalSearchResponse }>();
+
 
 
 

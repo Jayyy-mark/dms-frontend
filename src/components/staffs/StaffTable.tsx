@@ -3,20 +3,27 @@
 import { useNavigate } from "react-router";
 import { Staff } from "../../interfaces/staff";
 import { staffApi } from "../../api/staffApi";
+import { usePaginatedStaffs, StaffStats } from "../../hooks/useStaffs";
+import ServerPaginationBar from "../common/ServerPaginationBar";
 import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import ConfirmModal from "../common/ConfirmModal";
 import {
-    MoreHorizontal, Pencil, Trash2, ChevronLeft, ChevronRight, Search,
+    MoreHorizontal, Pencil, Trash2, Search,
     LayoutGrid, List, X, Mail, Phone, MapPin, Briefcase, User, BadgeCheck
 } from "lucide-react";
 
 export default function StaffTable({
-    staffs, setStaffs,
+    staffs: propStaffs,
+    setStaffs: propSetStaffs,
+    onStatsChange,
+    isLoading: propIsLoading,
 }: {
-    staffs: Staff[];
-    setStaffs: React.Dispatch<React.SetStateAction<Staff[]>>;
-}) {
+    staffs?: Staff[];
+    setStaffs?: React.Dispatch<React.SetStateAction<Staff[]>>;
+    onStatsChange?: (stats: StaffStats | undefined, isLoading: boolean) => void;
+    isLoading?: boolean;
+} = {}) {
     const navigate = useNavigate();
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<Staff | null>(null);
@@ -25,12 +32,46 @@ export default function StaffTable({
     const [dropdownPos, setDropdownPos] = useState<{ top: number; right: number } | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [snapshotId, setSnapshotId] = useState<number | undefined>(undefined);
     const [searchQuery, setSearchQuery] = useState("");
     const [activeTab, setActiveTab] = useState("all");
     const [viewMode, setViewMode] = useState<"list" | "grid">("list");
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
     const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
     const [detailItem, setDetailItem] = useState<Staff | null>(null);
+
+    const requestedOffset = (currentPage - 1) * itemsPerPage;
+    const swr = usePaginatedStaffs({
+        limit: itemsPerPage,
+        offset: requestedOffset,
+        tab: activeTab,
+        search: searchQuery.trim() || undefined,
+        snapshot_id: currentPage > 1 ? snapshotId : undefined,
+    });
+
+    const isLoading = propIsLoading !== undefined ? propIsLoading : swr.isLoading;
+    const [localStaffs, setLocalStaffs] = useState<Staff[]>([]);
+
+    useEffect(() => {
+        if (propStaffs !== undefined) {
+            setLocalStaffs(propStaffs);
+        } else if (swr.staffs) {
+            setLocalStaffs(swr.staffs);
+        }
+    }, [propStaffs, swr.staffs]);
+
+    useEffect(() => {
+        if (currentPage === 1 && swr.pagination?.snapshot_id) {
+            setSnapshotId(swr.pagination.snapshot_id);
+        }
+    }, [currentPage, swr.pagination?.snapshot_id]);
+
+    useEffect(() => {
+        onStatsChange?.(swr.stats, isLoading);
+    }, [swr.stats, isLoading]);
+
+    const staffs = propStaffs !== undefined ? propStaffs : localStaffs;
+    const setStaffs = propSetStaffs || setLocalStaffs;
 
     const toggleDropdown = (id: number, e: React.MouseEvent<HTMLButtonElement>) => {
         if (openDropdownId === id) {
@@ -63,8 +104,9 @@ export default function StaffTable({
         if (!deleteTarget) return;
         try {
             const msg = await staffApi.delete(deleteTarget.id);
-            toast.success(msg || "Deleted.");
+            toast.success(msg?.message || msg || "Deleted.");
             setStaffs((prev) => prev.filter((i) => i.id !== deleteTarget.id));
+            swr.mutate();
             setDeleteOpen(false); setDeleteTarget(null);
         } catch (err: any) { toast.error(err?.message || "Delete failed!"); }
     };
@@ -74,6 +116,7 @@ export default function StaffTable({
             await Promise.all([...selectedIds].map(id => staffApi.delete(id)));
             toast.success(`${selectedIds.size} staff(s) deleted.`);
             setStaffs(prev => prev.filter(i => !selectedIds.has(i.id)));
+            swr.mutate();
             setSelectedIds(new Set()); setBulkDeleteOpen(false);
         } catch (err: any) { toast.error(err?.message || "Bulk delete failed!"); }
     };
@@ -95,39 +138,23 @@ export default function StaffTable({
         });
     };
 
-    // Filter Logic
-    const filteredItems = staffs.filter(item => {
-        // Tab filter
-        if (activeTab === 'male' && item.staff_gender?.toLowerCase() !== 'male') return false;
-        if (activeTab === 'female' && item.staff_gender?.toLowerCase() !== 'female') return false;
-
-        // Search filter
-        if (searchQuery) {
-            const query = searchQuery.toLowerCase();
-            const match =
-                item.staff_name?.toLowerCase().includes(query) ||
-                item.staff_email?.toLowerCase().includes(query) ||
-                item.department?.department_name?.toLowerCase().includes(query) ||
-                item.role?.role_name?.toLowerCase().includes(query);
-            if (!match) return false;
-        }
-        return true;
-    });
-
-    // Stats for tabs
-    const stats = {
-        all: staffs.length,
-        male: staffs.filter(s => s.staff_gender?.toLowerCase() === 'male').length,
-        female: staffs.filter(s => s.staff_gender?.toLowerCase() === 'female').length,
+    // Server-side DB-level stats & pagination
+    const stats = swr.stats || {
+        all: 0,
+        male: 0,
+        female: 0,
     };
 
-    const totalPages = Math.max(1, Math.ceil(filteredItems.length / itemsPerPage));
-    const currentItems = filteredItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+    const totalEntries = swr.pagination?.total ?? staffs.length;
+    const totalPages = Math.max(1, swr.pagination?.total_pages ?? 1);
+    const currentItems = staffs;
+    const filteredItems = staffs;
+    const isCurrentPageData =
+        swr.pagination?.offset === requestedOffset && swr.pagination?.limit === itemsPerPage;
+    const isPageLoading = swr.isValidating && !isCurrentPageData;
+
     const isAllSelected = currentItems.length > 0 && currentItems.every(i => selectedIds.has(i.id));
     const isIndeterminate = !isAllSelected && currentItems.some(i => selectedIds.has(i.id));
-
-    const handlePreviousPage = () => { if (currentPage > 1) setCurrentPage(currentPage - 1); };
-    const handleNextPage = () => { if (currentPage < totalPages) setCurrentPage(currentPage + 1); };
 
     const getAvatarColor = (name: string) => {
         const colors = ['bg-red-100 text-red-600', 'bg-blue-100 text-[#997524]', 'bg-emerald-100 text-emerald-600', 'bg-purple-100 text-purple-600', 'bg-amber-100 text-amber-600'];
@@ -183,7 +210,7 @@ export default function StaffTable({
                     <div className="flex items-center gap-2 shrink-0">
                         <div className="h-5 w-px bg-gray-200 mx-1"></div>
                         <span className="text-[13px] font-bold text-gray-500">
-                            {filteredItems.length > 0 ? ((currentPage - 1) * itemsPerPage) + 1 : 0} of {filteredItems.length}
+                            {totalEntries > 0 ? ((currentPage - 1) * itemsPerPage) + 1 : 0}–{Math.min((currentPage - 1) * itemsPerPage + currentItems.length, totalEntries)} of {totalEntries.toLocaleString()}
                         </span>
                         <div className="flex items-center bg-gray-50 rounded-lg p-1 border border-gray-200">
                             <button onClick={() => setViewMode("list")} className={`p-1 rounded transition-colors ${viewMode === 'list' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-400 hover:text-gray-800 bg-transparent'}`}><List size={15} /></button>
@@ -196,6 +223,11 @@ export default function StaffTable({
             {/* Content View */}
             {viewMode === "list" ? (
                 <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                    {isPageLoading && (
+                        <div className="h-0.5 w-full bg-[#B88E2F]/20 overflow-hidden">
+                            <div className="h-full w-1/3 bg-[#B88E2F] animate-pulse" />
+                        </div>
+                    )}
                     <div className="overflow-x-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: '#cbd5e1 transparent' }}>
                         <table className="w-full min-w-[750px] text-left border-collapse">
                             <thead>
@@ -210,8 +242,27 @@ export default function StaffTable({
                                     <th className="px-6 py-4"></th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {currentItems.map((item) => (
+                            <tbody className={`divide-y divide-gray-100 transition-opacity ${isPageLoading ? "opacity-60" : ""}`}>
+                                {isLoading ? (
+                                    Array.from({ length: 8 }).map((_, idx) => (
+                                        <tr key={`stf-skel-row-${idx}`} className="animate-pulse">
+                                            <td className="px-6 py-4"><div className="w-4 h-4 rounded bg-gray-200" /></td>
+                                            <td className="px-6 py-4 min-w-[220px]">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-9 h-9 rounded-full bg-gray-200 shrink-0" />
+                                                    <div className="space-y-1.5">
+                                                        <div className="h-3.5 w-32 rounded bg-gray-200" />
+                                                        <div className="h-2.5 w-24 rounded bg-gray-100" />
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4"><div className="h-3.5 w-32 rounded bg-gray-200" /></td>
+                                            <td className="px-6 py-4"><div className="h-5 w-24 rounded-full bg-gray-100" /></td>
+                                            <td className="px-6 py-4"><div className="h-5 w-16 rounded-full bg-gray-100" /></td>
+                                            <td className="px-6 py-4 text-right"><div className="w-7 h-7 rounded-md bg-gray-100 ml-auto" /></td>
+                                        </tr>
+                                    ))
+                                ) : currentItems.map((item) => (
                                     <tr
                                         key={item.id}
                                         onClick={() => setDetailItem(item)}
@@ -252,7 +303,7 @@ export default function StaffTable({
                                         </td>
                                     </tr>
                                 ))}
-                                {filteredItems.length === 0 && (
+                                {!isLoading && filteredItems.length === 0 && (
                                     <tr>
                                         <td colSpan={6} className="px-6 py-12 text-center text-[13px] font-bold text-gray-400">No staff found.</td>
                                     </tr>
@@ -263,7 +314,30 @@ export default function StaffTable({
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {currentItems.map((item) => (
+                    {isLoading ? (
+                        Array.from({ length: 6 }).map((_, idx) => (
+                            <div
+                                key={`stf-skel-card-${idx}`}
+                                className="bg-white rounded-[1.25rem] border border-gray-100 shadow-xs p-6 animate-pulse space-y-4"
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-full bg-gray-200 shrink-0" />
+                                    <div className="space-y-2 flex-1">
+                                        <div className="h-4 w-32 rounded bg-gray-200" />
+                                        <div className="h-3 w-24 rounded bg-gray-100" />
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <div className="h-5 w-24 rounded-full bg-gray-100" />
+                                    <div className="h-5 w-16 rounded-full bg-gray-100" />
+                                </div>
+                                <div className="space-y-2">
+                                    <div className="h-3 w-36 rounded bg-gray-200" />
+                                    <div className="h-3 w-28 rounded bg-gray-100" />
+                                </div>
+                            </div>
+                        ))
+                    ) : currentItems.map((item) => (
                         <div
                             key={item.id}
                             onClick={() => setDetailItem(item)}
@@ -309,7 +383,7 @@ export default function StaffTable({
                             </div>
                         </div>
                     ))}
-                    {filteredItems.length === 0 && (
+                    {!isLoading && filteredItems.length === 0 && (
                         <div className="col-span-full py-12 text-center text-[13px] font-bold text-gray-400 bg-white rounded-xl border border-gray-100">
                             No staff found.
                         </div>
@@ -346,60 +420,21 @@ export default function StaffTable({
             })()}
 
             {/* Pagination Controls */}
-            {filteredItems.length > 0 && (
-                <div className="flex items-center justify-between pt-5">
-                    <div className="flex items-center gap-3">
-                        <span className="text-[13px] font-bold text-gray-500">Rows per page:</span>
-                        <select
-                            value={itemsPerPage}
-                            onChange={e => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
-                            className="text-[13px] font-semibold text-gray-700 border border-gray-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-[#B88E2F]/30"
-                        >
-                            {[5, 10, 20, 50].map(n => <option key={n} value={n}>{n}</option>)}
-                        </select>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <span className="text-[13px] font-bold text-gray-500">Page {currentPage} of {totalPages}</span>
-                        <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm">
-                            <button
-                                onClick={handlePreviousPage}
-                                disabled={currentPage === 1}
-                                className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 transition-colors"
-                            >
-                                <span className="sr-only">Previous</span>
-                                <ChevronLeft className="h-5 w-5" aria-hidden="true" />
-                            </button>
-                            {Array.from({ length: totalPages }, (_, i) => i + 1)
-                                .filter(page => page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1)
-                                .reduce<(number | '...')[]>((acc, page, idx, arr) => {
-                                    if (idx > 0 && (page as number) - (arr[idx - 1] as number) > 1) acc.push('...');
-                                    acc.push(page);
-                                    return acc;
-                                }, [])
-                                .map((item, idx) =>
-                                    item === '...' ? (
-                                        <span key={`ellipsis-${idx}`} className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700 ring-1 ring-inset ring-gray-300">...</span>
-                                    ) : (
-                                        <button
-                                            key={item}
-                                            onClick={() => setCurrentPage(item as number)}
-                                            className={`relative inline-flex items-center px-4 py-2 text-[13px] font-semibold ring-1 ring-inset ring-gray-300 focus:z-20 focus:outline-offset-0 transition-colors ${currentPage === item ? 'z-10 bg-[#B88E2F] text-white' : 'text-gray-900 hover:bg-gray-50'}`}
-                                        >
-                                            {item}
-                                        </button>
-                                    )
-                                )}
-                            <button
-                                onClick={handleNextPage}
-                                disabled={currentPage === totalPages || totalPages === 0}
-                                className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 transition-colors"
-                            >
-                                <span className="sr-only">Next</span>
-                                <ChevronRight className="h-5 w-5" aria-hidden="true" />
-                            </button>
-                        </nav>
-                    </div>
-                </div>
+            {!isLoading && totalEntries > 0 && (
+                <ServerPaginationBar
+                    currentPage={currentPage}
+                    itemsPerPage={itemsPerPage}
+                    totalEntries={totalEntries}
+                    totalPages={totalPages}
+                    remainingEntries={swr.pagination?.remaining}
+                    remainingPages={swr.pagination?.remaining_pages}
+                    currentCount={currentItems.length}
+                    onPageChange={(page) => setCurrentPage(page)}
+                    onItemsPerPageChange={(limit) => {
+                        setItemsPerPage(limit);
+                        setCurrentPage(1);
+                    }}
+                />
             )}
 
             <ConfirmModal

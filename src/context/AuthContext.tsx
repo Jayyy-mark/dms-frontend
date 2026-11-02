@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import api from "../helpers/api";
+import { authApi } from "../api/auth/authApi";
 import { userRoleApi } from "../api/userRoleApi";
 import { USER_ROLES_CHANGE_EVENT } from "../utils/userRoleManager";
 import { MODULE_CHANGE_EVENT } from "../utils/moduleManager";
@@ -26,7 +27,7 @@ export type FeaturePermissionRecord = {
 export type AuthContextType = {
   user: User | null;
   setUser: (user: User | null) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
   loading: boolean;
   permissions: Record<string, FeaturePermissionRecord>;
   featureStatus: Record<string, boolean>;
@@ -45,7 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
-      await api.post("auth/logout/");
+      await authApi.logout();
     } catch (e) {
       console.error("Logout failed:", e);
     }

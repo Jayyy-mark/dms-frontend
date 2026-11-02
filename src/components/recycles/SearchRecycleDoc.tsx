@@ -55,7 +55,7 @@ const SearchRecycleDocument = forwardRef(({ onSearch }: any, ref) => {
 
 
     const handleSubmit = () => {
-        onSearch(form);
+        return onSearch(form);
     };
 
     const rangeRef = useRef<any>(null);

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "../../icons";
 import Label from "../form/Label";
@@ -11,12 +11,14 @@ import { toast } from "react-toastify";
 
 export default function SignInForm() {
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const navigate = useNavigate();
-  const { setUser } = useAuth();
+  const { setUser, refreshPermissions } = useAuth();
   const [form, setForm] = useState<SignInFormData>({
     email: "",
-    password: ""
-  })
+    password: "",
+  });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -26,13 +28,19 @@ export default function SignInForm() {
     }));
   };
 
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSignIn = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+
+    // Prevent simultaneous or repeated submissions while request is in flight
+    if (submittingRef.current || isSubmitting) return;
 
     if (!form.email.trim() || !form.password.trim()) {
       await toast.warning("Please enter both email and password.");
       return;
     }
+
+    submittingRef.current = true;
+    setIsSubmitting(true);
 
     try {
       const response = await authApi.login(form);
@@ -42,34 +50,50 @@ export default function SignInForm() {
 
       if (user.is_active === false) {
         await toast.error("Your account has been banned.");
+        submittingRef.current = false;
+        setIsSubmitting(false);
         return;
       }
 
-      await toast.success("Login Successful!");
-      console.log("SERVER RESPONSE :", response);
-
       setUser(user);
-      setTimeout(() => {
-        navigate('/');
-      }, 1000);
+      await refreshPermissions();
+      await toast.success("Login Successful!");
 
-    } catch (error: any) {
-      const data = error?.response?.data;
+      setTimeout(() => {
+        navigate("/");
+      }, 600);
+    } catch (error: unknown) {
+      const errObj = error as {
+        response?: {
+          data?: {
+            non_field_errors?: string[];
+            detail?: string;
+            error?: string;
+            message?: string;
+            email?: string[];
+          };
+        };
+      };
+      const data = errObj?.response?.data;
       const errorMsg =
         data?.non_field_errors?.[0] ||
+        data?.email?.[0] ||
         data?.detail ||
         data?.error ||
         data?.message ||
-        'Invalid Credentials';
+        "Invalid Credentials";
 
-      console.log("Login error:", errorMsg);
-      if (typeof errorMsg === 'string' && errorMsg.toLowerCase().includes('banned')) {
+      if (typeof errorMsg === "string" && errorMsg.toLowerCase().includes("banned")) {
         await toast.error(errorMsg);
       } else {
         await toast.warning(errorMsg);
       }
+
+      submittingRef.current = false;
+      setIsSubmitting(false);
     }
   };
+
   return (
     <div className="flex flex-col flex-1">
       <div className="w-full max-w-md pt-10 mx-auto">
@@ -103,10 +127,12 @@ export default function SignInForm() {
                   <Label>
                     Email <span className="text-error-500">*</span>{" "}
                   </Label>
-                  <Input placeholder="info@gmail.com"
+                  <Input
+                    placeholder="info@gmail.com"
                     id="email"
                     name="email"
                     value={form.email}
+                    disabled={isSubmitting}
                     onChange={handleChange}
                   />
                 </div>
@@ -121,10 +147,11 @@ export default function SignInForm() {
                       id="password"
                       name="password"
                       value={form.password}
+                      disabled={isSubmitting}
                       onChange={handleChange}
                     />
                     <span
-                      onClick={() => setShowPassword(!showPassword)}
+                      onClick={() => !isSubmitting && setShowPassword(!showPassword)}
                       className="absolute z-30 -translate-y-1/2 cursor-pointer right-4 top-1/2"
                     >
                       {showPassword ? (
@@ -136,16 +163,44 @@ export default function SignInForm() {
                   </div>
                 </div>
                 <div>
-                  <Button className="w-full" size="sm"
-                    onClick={handleSignIn}
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    size="sm"
+                    disabled={isSubmitting}
                   >
-                    Sign in
+                    {isSubmitting ? (
+                      <>
+                        <svg
+                          className="animate-spin h-4 w-4 text-white"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          aria-hidden="true"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          />
+                        </svg>
+                        <span>Signing in...</span>
+                      </>
+                    ) : (
+                      "Sign in"
+                    )}
                   </Button>
                 </div>
               </div>
             </form>
-
-
           </div>
         </div>
       </div>

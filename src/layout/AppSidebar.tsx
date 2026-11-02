@@ -194,16 +194,12 @@ const documentItems: NavItem[] = [
   {
     icon: <ArchiveIcon />,
     name: "archives",
-    subItems: [
-      { name: "Archived Documents Lists", path: "/documents/archives/" },
-    ],
+    path: "/documents/archives/",
   },
   {
     icon: <RecycleIcon />,
     name: "recycle_bin",
-    subItems: [
-      { name: "Recycled Documents Lists", path: "/documents/recycles/" },
-    ],
+    path: "/documents/recycles/",
   },
   {
     icon: <Layers />,

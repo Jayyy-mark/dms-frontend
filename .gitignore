@@ -24,3 +24,6 @@ dist-ssr
 
 replace-colors.cjs
 replace-gold.cjs
+
+moge-backend.tar
+moge-frontend.tar

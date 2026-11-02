@@ -9,16 +9,18 @@ import { parseApiError } from "../../helpers/parseApiError";
 
 export default function Roles() {
   const [roles, setRoles] = useState<Role[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState<AddRole>({ role_name: "" });
 
   const fetchAll = async () => {
+    setIsLoading(true);
     try {
       const data = await roleApi.all();
-      setRoles(data.roles || data);
+      setRoles(data.roles || data); setIsLoading(false);
     } catch (error: any) {
-      toast.error(error?.message || "Failed to fetch lists");
+      toast.error(error?.message || "Failed to fetch lists"); setIsLoading(false);
     }
   };
 
@@ -52,14 +54,14 @@ export default function Roles() {
             <div className="p-3.5 bg-[#FEF3C7] rounded-full text-[#B88E2F]"><EntityIcon size={22} /></div>
             <div>
               <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Total Roles</p>
-              <h3 className="text-[28px] font-extrabold text-[#0f172a] mt-0.5 leading-none">{total}</h3>
+              <h3 className="text-[28px] font-extrabold text-[#0f172a] mt-0.5 leading-none">{isLoading ? <span className="inline-block h-7 w-16 rounded-lg bg-gray-200 animate-pulse" /> : total}</h3>
             </div>
           </div>
           
         </div>
 
         <div>
-          <RoleTable roles={roles} setRoles={setRoles} />
+          <RoleTable roles={roles} setRoles={setRoles} isLoading={isLoading} />
         </div>
       </div>
 

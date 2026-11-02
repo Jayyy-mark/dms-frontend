@@ -10,6 +10,7 @@ import { useNavigate } from "react-router";
 import { toast } from "react-toastify";
 import { useFormErrors } from "../../hooks/useFormErrors.ts";
 import { parseApiError } from "../../helpers/parseApiError.ts";
+import ActionButton from "../ui/button/ActionButton";
 
 export default function AddDtypeForm() {
   const { t } = useTranslation();
@@ -50,8 +51,9 @@ export default function AddDtypeForm() {
                 </div>
 
                 <div className="md:col-span-3 flex">
-                    <button
+                    <ActionButton
                         onClick={handleSubmit}
+                        loadingText={`${t("Create dtype")}...`}
                         className="
       flex items-center gap-2 
       px-4 py-2 
@@ -80,7 +82,7 @@ export default function AddDtypeForm() {
                             />
                         </svg>
                         {t("Create dtype")}
-                    </button>
+                    </ActionButton>
                 </div>
             </div>
         </ComponentCard>

@@ -26,9 +26,11 @@ import {
 export default function UserTable({
     users,
     setUsers,
+    isLoading = false,
 }: {
     users: User[];
     setUsers: React.Dispatch<React.SetStateAction<User[]>>;
+    isLoading?: boolean;
 }) {
     const navigate = useNavigate();
 
@@ -362,7 +364,26 @@ export default function UserTable({
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {currentUsers.map((user) => {
+                                {isLoading ? (
+                                    Array.from({ length: 8 }).map((_, idx) => (
+                                        <tr key={`usr-skel-row-${idx}`} className="animate-pulse">
+                                            <td className="px-6 py-4"><div className="w-4 h-4 rounded bg-gray-200" /></td>
+                                            <td className="px-6 py-4 min-w-[200px]">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-9 h-9 rounded-full bg-gray-200 shrink-0" />
+                                                    <div className="space-y-1.5">
+                                                        <div className="h-3.5 w-32 rounded bg-gray-200" />
+                                                        <div className="h-2.5 w-16 rounded bg-gray-100" />
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4"><div className="h-3.5 w-36 rounded bg-gray-200" /></td>
+                                            <td className="px-6 py-4"><div className="h-5 w-20 rounded-full bg-gray-100" /></td>
+                                            <td className="px-6 py-4"><div className="h-5 w-16 rounded-full bg-gray-100" /></td>
+                                            <td className="px-6 py-4 text-right"><div className="w-7 h-7 rounded-md bg-gray-100 ml-auto" /></td>
+                                        </tr>
+                                    ))
+                                ) : currentUsers.map((user) => {
                                     const nameInitial = user.username ? user.username.charAt(0).toUpperCase() : 'U';
                                     const avatarClass = getAvatarColor(user.username || 'U');
                                     return (
@@ -418,7 +439,7 @@ export default function UserTable({
                                     );
                                 })}
 
-                                {filteredUsers.length === 0 && (
+                                {!isLoading && filteredUsers.length === 0 && (
                                     <tr>
                                         <td colSpan={6} className="px-6 py-12 text-center text-[13px] font-bold text-gray-400">
                                             No users found.
@@ -431,7 +452,27 @@ export default function UserTable({
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {currentUsers.map((user) => {
+                    {isLoading ? (
+                        Array.from({ length: 6 }).map((_, idx) => (
+                            <div
+                                key={`usr-skel-card-${idx}`}
+                                className="bg-white rounded-[1.25rem] border border-gray-100 shadow-xs p-6 animate-pulse space-y-4"
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-full bg-gray-200 shrink-0" />
+                                    <div className="space-y-2 flex-1">
+                                        <div className="h-4 w-32 rounded bg-gray-200" />
+                                        <div className="h-3 w-20 rounded bg-gray-100" />
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <div className="h-5 w-20 rounded-full bg-gray-100" />
+                                    <div className="h-5 w-16 rounded-full bg-gray-100" />
+                                </div>
+                                <div className="h-3 w-40 rounded bg-gray-100" />
+                            </div>
+                        ))
+                    ) : currentUsers.map((user) => {
                         const nameInitial = user.username ? user.username.charAt(0).toUpperCase() : 'U';
                         const avatarClass = getAvatarColor(user.username || 'U');
                         return (
@@ -479,7 +520,7 @@ export default function UserTable({
                         );
                     })}
 
-                    {filteredUsers.length === 0 && (
+                    {!isLoading && filteredUsers.length === 0 && (
                         <div className="col-span-full py-12 text-center text-[13px] font-bold text-gray-400 bg-white rounded-xl border border-gray-100">
                             No users found.
                         </div>

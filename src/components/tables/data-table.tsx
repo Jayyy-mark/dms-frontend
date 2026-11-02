@@ -9,34 +9,48 @@ import {
     flexRender,
 } from "@tanstack/react-table";
 import { useState } from "react";
-import { Search, Trash2, FileText, FileSpreadsheet, File, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Search, Trash2, FileText, X } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import * as XLSX from "xlsx";
-import { saveAs } from "file-saver";
-import { Document, Packer, Paragraph, Table, TableRow, TableCell } from "docx";
 import { ColumnDef } from "@tanstack/react-table";
 import { useTranslation } from "react-i18next";
+import ActionButton from "../ui/button/ActionButton";
+import ServerPaginationBar, { PAGE_SIZE_OPTIONS } from "../common/ServerPaginationBar";
 
+export interface DataTableServerPagination {
+    currentPage: number;
+    itemsPerPage: number;
+    totalEntries: number;
+    totalPages: number;
+    remainingEntries?: number;
+    remainingPages?: number;
+    isPageLoading?: boolean;
+    searchValue?: string;
+    onSearchChange?: (val: string) => void;
+    onPageChange: (page: number) => void;
+    onItemsPerPageChange: (limit: number) => void;
+}
 
 type DataTableProps<T extends { id: number }> = {
-  data: T[];
-  columns: ColumnDef<T, any>[];
-  isLoading?: boolean;
-  tableTitle?: string;
-  headerActions?: React.ReactNode;
-  renderDetailPanel?: (row: T, onClose: () => void) => React.ReactNode;
-  onExportPDF?: (currentFilter?: string) => void;
+    data: T[];
+    columns: ColumnDef<T, any>[];
+    isLoading?: boolean;
+    tableTitle?: string;
+    headerActions?: React.ReactNode;
+    renderDetailPanel?: (row: T, onClose: () => void) => React.ReactNode;
+    onExportPDF?: (currentFilter?: string) => void | Promise<unknown>;
+    serverPagination?: DataTableServerPagination;
 };
 
 export function DataTable<T extends { id: number }>({
-  data,
-  columns,
-  isLoading = false,
-  tableTitle,
-  headerActions,
-  renderDetailPanel,
-  onExportPDF,
+    data,
+    columns,
+    isLoading = false,
+    tableTitle,
+    headerActions,
+    renderDetailPanel,
+    onExportPDF,
+    serverPagination,
 }: DataTableProps<T>) {
     const { t } = useTranslation();
     const [globalFilter, setGlobalFilter] = useState("");
@@ -44,11 +58,15 @@ export function DataTable<T extends { id: number }>({
     const [detailRow, setDetailRow] = useState<T | null>(null);
     const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
+    const isServerPaginated = Boolean(serverPagination);
+    const activeSearch = isServerPaginated ? (serverPagination?.searchValue ?? "") : globalFilter;
+
     const table = useReactTable({
         data,
         columns,
         state: { globalFilter, rowSelection },
-
+        manualPagination: isServerPaginated,
+        manualFiltering: isServerPaginated,
         onGlobalFilterChange: setGlobalFilter,
 
         globalFilterFn: (row, columnId, filterValue) => {
@@ -77,9 +95,9 @@ export function DataTable<T extends { id: number }>({
         .getFilteredRowModel()
         .rows.map((row) => row.original);
 
-    const handleExportPDF = () => {
+    const handleExportPDF = async () => {
         if (onExportPDF) {
-            onExportPDF(globalFilter);
+            await onExportPDF(activeSearch);
             return;
         }
 
@@ -92,45 +110,6 @@ export function DataTable<T extends { id: number }>({
 
         doc.save("documents.pdf");
     };
-    const exportExcel = () => {
-        const worksheet = XLSX.utils.json_to_sheet(exportData);
-        const workbook = XLSX.utils.book_new();
-
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Documents");
-
-        XLSX.writeFile(workbook, "documents.xlsx");
-    };
-    const exportWord = async () => {
-        const tableRows = exportData.map(
-            (row) =>
-                new TableRow({
-                    children: Object.values(row).map(
-                        (cell) =>
-                            new TableCell({
-                                children: [new Paragraph(String(cell ?? ""))],
-                            })
-                    ),
-                })
-        );
-
-        const doc = new Document({
-            sections: [
-                {
-                    children: [
-                        new Table({
-                            rows: tableRows,
-                        }),
-                    ],
-                },
-            ],
-        });
-
-        const blob = await Packer.toBlob(doc);
-        saveAs(blob, "documents.docx");
-    };
-
-
-
 
     return (
         <div className="w-full bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -142,8 +121,14 @@ export function DataTable<T extends { id: number }>({
                     <input
                         type="text"
                         placeholder={t("Search...")}
-                        value={globalFilter ?? ""}
-                        onChange={(e) => setGlobalFilter(e.target.value)}
+                        value={activeSearch}
+                        onChange={(e) => {
+                            if (isServerPaginated && serverPagination?.onSearchChange) {
+                                serverPagination.onSearchChange(e.target.value);
+                            } else {
+                                setGlobalFilter(e.target.value);
+                            }
+                        }}
                         className="w-full bg-transparent border-none outline-none focus:ring-0 text-sm text-gray-500 px-3 py-2 placeholder-gray-400"
                     />
                 </div>
@@ -160,11 +145,18 @@ export function DataTable<T extends { id: number }>({
                             <div className="flex items-center gap-2 text-[13px] font-semibold text-gray-500 px-2">
                                 <span>{t("Show")}</span>
                                 <select
-                                    value={table.getState().pagination.pageSize}
-                                    onChange={(e) => table.setPageSize(Number(e.target.value))}
+                                    value={isServerPaginated ? serverPagination!.itemsPerPage : table.getState().pagination.pageSize}
+                                    onChange={(e) => {
+                                        const val = Number(e.target.value);
+                                        if (isServerPaginated) {
+                                            serverPagination!.onItemsPerPageChange(val);
+                                        } else {
+                                            table.setPageSize(val);
+                                        }
+                                    }}
                                     className="rounded border border-gray-200 px-2 py-1 focus:ring-[#B88E2F] focus:border-[#B88E2F] outline-none bg-white transition-all hover:border-gray-300"
                                 >
-                                    {[5, 10, 20, 50].map((size) => (
+                                    {PAGE_SIZE_OPTIONS.map((size) => (
                                         <option key={size} value={size}>
                                             {size}
                                         </option>
@@ -182,7 +174,6 @@ export function DataTable<T extends { id: number }>({
                         {table.getSelectedRowModel().rows.length > 0 && (
                             <button
                                 onClick={() => {
-                                    // Custom bulk delete hook or prop
                                     console.log("Bulk delete");
                                 }}
                                 className="flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-[12px] font-bold text-red-600 transition hover:bg-red-100 shadow-sm"
@@ -191,18 +182,12 @@ export function DataTable<T extends { id: number }>({
                                 {t("Delete Selected")}
                             </button>
                         )}
-                        
+
                         {/* Export Buttons */}
                         <div className="flex items-center bg-gray-50 rounded-lg p-1 border border-gray-200 gap-1">
-                            <button onClick={handleExportPDF} className="p-1 rounded transition-colors text-gray-400 hover:text-red-500 hover:bg-white shadow-sm" title="Export PDF">
+                            <ActionButton onClick={handleExportPDF} className="p-1 rounded transition-colors text-gray-400 hover:text-red-500 hover:bg-white shadow-sm" title="Export PDF">
                                 <FileText size={15} />
-                            </button>
-                            <button onClick={exportExcel} className="p-1 rounded transition-colors text-gray-400 hover:text-green-600 hover:bg-white shadow-sm" title="Export Excel">
-                                <FileSpreadsheet size={15} />
-                            </button>
-                            <button onClick={exportWord} className="p-1 rounded transition-colors text-gray-400 hover:text-[#997524] hover:bg-white shadow-sm" title="Export Word">
-                                <File size={15} />
-                            </button>
+                            </ActionButton>
                         </div>
                     </div>
                 </div>
@@ -210,6 +195,11 @@ export function DataTable<T extends { id: number }>({
 
             {/* Table Area */}
             <div>
+                {serverPagination?.isPageLoading && (
+                    <div className="h-0.5 w-full bg-[#B88E2F]/20 overflow-hidden">
+                        <div className="h-full w-1/3 bg-[#B88E2F] animate-pulse" />
+                    </div>
+                )}
                 <div className="overflow-x-auto custom-scrollbar" style={{ scrollbarWidth: 'thin', scrollbarColor: '#cbd5e1 transparent' }}>
                     <table className="w-full text-left border-collapse">
                         <thead>
@@ -217,8 +207,8 @@ export function DataTable<T extends { id: number }>({
                                 {table.getHeaderGroups().map((headerGroup) => (
                                     headerGroup.headers.map((header) => {
                                         const headerContent = header.column.columnDef.header;
-                                        const renderedHeader = typeof headerContent === "string" 
-                                            ? t(headerContent) 
+                                        const renderedHeader = typeof headerContent === "string"
+                                            ? t(headerContent)
                                             : flexRender(headerContent, header.getContext());
                                         return (
                                             <th
@@ -238,17 +228,35 @@ export function DataTable<T extends { id: number }>({
                             </tr>
                         </thead>
 
-                        <tbody className="divide-y divide-gray-100 bg-white">
+                        <tbody className={`divide-y divide-gray-100 bg-white transition-opacity ${serverPagination?.isPageLoading ? "opacity-60" : ""}`}>
                             {isLoading ? (
-                                <tr>
-                                    <td colSpan={table.getAllColumns().length} className="text-center py-12 text-[13px] font-bold text-gray-400">
-                                        {t("Loading data...")}
-                                    </td>
-                                </tr>
+                                Array.from({ length: 8 }).map((_, rowIdx) => (
+                                    <tr key={`skeleton-row-${rowIdx}`} className="animate-pulse">
+                                        {table.getAllColumns().map((col, colIdx) => (
+                                            <td key={`skeleton-cell-${rowIdx}-${col.id || colIdx}`} className="px-6 py-4 whitespace-nowrap">
+                                                {col.id === 'select' ? (
+                                                    <div className="w-4 h-4 rounded bg-gray-200" />
+                                                ) : col.id === 'actions' ? (
+                                                    <div className="w-7 h-7 rounded-md bg-gray-100 ml-auto" />
+                                                ) : colIdx === 1 ? (
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-9 h-9 rounded-lg bg-gray-200 shrink-0" />
+                                                        <div className="space-y-1.5">
+                                                            <div className="h-3.5 w-32 rounded bg-gray-200" />
+                                                            <div className="h-2.5 w-20 rounded bg-gray-100" />
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="h-3.5 w-24 rounded bg-gray-200" />
+                                                )}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                ))
                             ) : table.getRowModel().rows.length > 0 ? (
                                 table.getRowModel().rows.map((row) => (
-                                    <tr 
-                                        key={row.id} 
+                                    <tr
+                                        key={row.id}
                                         onClick={() => setDetailRow(row.original)}
                                         className={`hover:bg-[#FEF3C7]/30 transition-colors group cursor-pointer ${row.getIsSelected() ? 'bg-[#FEF3C7]/50' : ''}`}
                                     >
@@ -276,34 +284,38 @@ export function DataTable<T extends { id: number }>({
                 </div>
 
                 {/* Pagination */}
-                <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-4 bg-white">
-                    <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
-                        <p className="text-[13px] font-semibold text-gray-700">
-                            {t("Showing")} <span className="font-bold">{table.getFilteredRowModel().rows.length > 0 ? table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1 : 0}</span> {t("to")} <span className="font-bold">{Math.min((table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize, table.getFilteredRowModel().rows.length)}</span> {t("of")} <span className="font-bold">{table.getFilteredRowModel().rows.length}</span> {t("entries")}
-                        </p>
-                    </div>
-
-                    <div className="flex items-center justify-between w-full sm:w-auto mt-4 sm:mt-0">
-                        <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
-                            <button
-                                className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 transition-colors"
-                                disabled={!table.getCanPreviousPage()}
-                                onClick={() => table.previousPage()}
-                            >
-                                <span className="sr-only">Previous</span>
-                                <ChevronLeft className="h-5 w-5" aria-hidden="true" />
-                            </button>
-                            <button
-                                className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 transition-colors"
-                                disabled={!table.getCanNextPage()}
-                                onClick={() => table.nextPage()}
-                            >
-                                <span className="sr-only">Next</span>
-                                <ChevronRight className="h-5 w-5" aria-hidden="true" />
-                            </button>
-                        </nav>
-                    </div>
-                </div>
+                {isServerPaginated && serverPagination ? (
+                    !isLoading && serverPagination.totalEntries > 0 && (
+                        <ServerPaginationBar
+                            currentPage={serverPagination.currentPage}
+                            itemsPerPage={serverPagination.itemsPerPage}
+                            totalEntries={serverPagination.totalEntries}
+                            totalPages={serverPagination.totalPages}
+                            remainingEntries={serverPagination.remainingEntries}
+                            remainingPages={serverPagination.remainingPages}
+                            currentCount={data.length}
+                            onPageChange={serverPagination.onPageChange}
+                            onItemsPerPageChange={serverPagination.onItemsPerPageChange}
+                            className="border-t border-gray-100"
+                        />
+                    )
+                ) : (
+                    !isLoading && table.getFilteredRowModel().rows.length > 0 && (
+                        <ServerPaginationBar
+                            currentPage={table.getState().pagination.pageIndex + 1}
+                            itemsPerPage={table.getState().pagination.pageSize}
+                            totalEntries={table.getFilteredRowModel().rows.length}
+                            totalPages={Math.max(1, table.getPageCount())}
+                            currentCount={table.getRowModel().rows.length}
+                            onPageChange={(page) => table.setPageIndex(page - 1)}
+                            onItemsPerPageChange={(limit) => {
+                                table.setPageSize(limit);
+                                table.setPageIndex(0);
+                            }}
+                            className="border-t border-gray-100"
+                        />
+                    )
+                )}
             </div>
 
             {/* ── Floating bulk-action bar ── */}

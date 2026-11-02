@@ -12,10 +12,11 @@ import {
 } from "lucide-react";
 
 export default function StypeTable({
-    stypes, setStypes,
+    stypes, setStypes, isLoading = false,
 }: {
     stypes: Stype[];
     setStypes: React.Dispatch<React.SetStateAction<Stype[]>>;
+    isLoading?: boolean;
 }) {
     const navigate = useNavigate();
     const [deleteOpen, setDeleteOpen] = useState(false);
@@ -183,7 +184,23 @@ export default function StypeTable({
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {currentItems.map((item) => (
+                                {isLoading ? (
+                                    Array.from({ length: 6 }).map((_, idx) => (
+                                        <tr key={`stype-skel-row-${idx}`} className="animate-pulse">
+                                            <td className="px-6 py-4"><div className="w-4 h-4 rounded bg-gray-200" /></td>
+                                            <td className="px-6 py-4 min-w-[200px]">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-9 h-9 rounded-full bg-gray-200 shrink-0" />
+                                                    <div className="space-y-1.5">
+                                                        <div className="h-3.5 w-36 rounded bg-gray-200" />
+                                                        <div className="h-2.5 w-16 rounded bg-gray-100" />
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-right"><div className="w-7 h-7 rounded-md bg-gray-100 ml-auto" /></td>
+                                        </tr>
+                                    ))
+                                ) : currentItems.map((item) => (
                                     <tr key={item.id} onClick={() => setDetailItem(item)} className={`hover:bg-[#FEF3C7]/30 transition-colors group cursor-pointer ${selectedIds.has(item.id) ? 'bg-[#FEF3C7]/50' : ''}`}>
                                         <td className="px-6 py-4 whitespace-nowrap" onClick={e => e.stopPropagation()}>
                                             <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelectOne(item.id)} className="rounded text-[#B88E2F] focus:ring-[#B88E2F] border-gray-300 w-4 h-4 cursor-pointer" />
@@ -206,14 +223,24 @@ export default function StypeTable({
                                         </td>
                                     </tr>
                                 ))}
-                                {filteredItems.length === 0 && <tr><td colSpan={3} className="px-6 py-12 text-center text-[13px] font-bold text-gray-400">No items found.</td></tr>}
+                                {!isLoading && filteredItems.length === 0 && <tr><td colSpan={3} className="px-6 py-12 text-center text-[13px] font-bold text-gray-400">No items found.</td></tr>}
                             </tbody>
                         </table>
                     </div>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {currentItems.map((item) => (
+                    {isLoading ? (
+                        Array.from({ length: 6 }).map((_, idx) => (
+                            <div key={`stype-skel-card-${idx}`} className="bg-white rounded-[1.25rem] border border-gray-100 shadow-xs p-6 animate-pulse flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-full bg-gray-200 shrink-0" />
+                                <div className="space-y-2 flex-1">
+                                    <div className="h-4 w-32 rounded bg-gray-200" />
+                                    <div className="h-3 w-20 rounded bg-gray-100" />
+                                </div>
+                            </div>
+                        ))
+                    ) : currentItems.map((item) => (
                         <div key={item.id} onClick={() => setDetailItem(item)} className="bg-white rounded-[1.25rem] border border-gray-100 shadow-[0_4px_20px_-8px_rgba(0,0,0,0.08)] p-6 hover:shadow-[0_8px_30px_-8px_rgba(0,0,0,0.12)] transition-all cursor-pointer hover:border-blue-100">
                             <div className="flex justify-between items-start mb-2">
                                 <div className="flex items-center gap-4">
@@ -233,7 +260,7 @@ export default function StypeTable({
                             </div>
                         </div>
                     ))}
-                    {filteredItems.length === 0 && <div className="col-span-full py-12 text-center text-[13px] font-bold text-gray-400 bg-white rounded-xl border border-gray-100">No items found.</div>}
+                    {!isLoading && filteredItems.length === 0 && <div className="col-span-full py-12 text-center text-[13px] font-bold text-gray-400 bg-white rounded-xl border border-gray-100">No items found.</div>}
                 </div>
             )}
 

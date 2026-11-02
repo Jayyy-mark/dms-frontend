@@ -13,6 +13,7 @@ import Select from "react-select";
 import { useSelectOptions } from "../../hooks/useSelectOptions";
 import { useFormErrors } from "../../hooks/useFormErrors.ts";
 import { parseApiError } from "../../helpers/parseApiError.ts";
+import ActionButton from "../ui/button/ActionButton";
 
 export default function AddCategoryForm() {
   const { t } = useTranslation();
@@ -76,8 +77,9 @@ export default function AddCategoryForm() {
                 />
                 </div>                
                 <div className="md:col-span-3 flex">
-                    <button
+                    <ActionButton
                         onClick={handleSubmit}
+                        loadingText={`${t("Create category")}...`}
                         className="
       flex items-center gap-2 
       px-4 py-2 
@@ -106,7 +108,7 @@ export default function AddCategoryForm() {
                             />
                         </svg>
                         {t("Create category")}
-                    </button>
+                    </ActionButton>
                 </div>
             </div>
         </ComponentCard>

@@ -1,12 +1,20 @@
 import api from "../helpers/api";
-import { Log } from "../interfaces/log";
+import { Log, LogFilterParams, LogPaginatedResponse, LogQueryParams, LogStats } from "../interfaces/log";
 
 export const auditLogApi = {
-    async all(): Promise<Log[]> {
-        const res = await api.get("log/all/");
+    async all(params?: LogFilterParams): Promise<Log[]> {
+        const res = await api.get("log/all/", { params });
         return res.data.logs;
     },
-    async exportPdf(params?: { date?: string; action?: string; role?: string; search?: string }): Promise<Blob> {
+    async list(params: LogQueryParams): Promise<LogPaginatedResponse> {
+        const res = await api.get("log/list/", { params });
+        return res.data;
+    },
+    async stats(params?: Pick<LogFilterParams, "tz">): Promise<LogStats> {
+        const res = await api.get("log/stats/", { params });
+        return res.data.stats;
+    },
+    async exportPdf(params?: { date?: string; action?: string; role?: string; search?: string; tz?: string }): Promise<Blob> {
         const res = await api.get("log/export-pdf/", {
             params,
             responseType: "blob",

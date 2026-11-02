@@ -34,6 +34,7 @@ import { useFormErrors } from "../../hooks/useFormErrors.ts";
 import { parseApiError } from "../../helpers/parseApiError.ts";
 import { useCurrentStaff } from "../../hooks/useStaff.ts";
 import { useAuth } from "../../context/AuthContext.tsx";
+import ActionButton from "../ui/button/ActionButton.tsx";
 
 const emptyDocument: AddDocument = {
   document_name: "",
@@ -908,13 +909,14 @@ export default function AddDocumentForm() {
         >
           {t("Cancel")}
         </button>
-        <button
+        <ActionButton
           type="button"
           onClick={handleSubmit}
+          loadingText={`${t("Create Document")}...`}
           className="px-6 py-2.5 bg-[#B88E2F] hover:bg-[#997524] text-white text-xs font-bold rounded-2xl transition shadow-md shadow-amber-200 flex items-center gap-2"
         >
           <Plus size={16} /> {t("Create Document")}
-        </button>
+        </ActionButton>
       </div>
     </div>
   );

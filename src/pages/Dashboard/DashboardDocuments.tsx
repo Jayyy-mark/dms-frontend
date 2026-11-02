@@ -5,8 +5,8 @@ export default function DashboardDocuments() {
   return (
     <>
       <PageMeta
-        title="MOGE Dashboard — Documents"
-        description="MOGE Internal System Management Dashboard — Documents view"
+        title="MOGE Executive Document Command Center — Director General Dashboard"
+        description="MOGE Organization-Wide Document Intelligence & Catalog across all departments and staffs (Daily, Weekly, Monthly)"
       />
       <DashboardDocumentsTab />
     </>

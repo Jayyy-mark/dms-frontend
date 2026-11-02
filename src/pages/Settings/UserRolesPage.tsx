@@ -8,7 +8,6 @@ import {
   CheckSquare,
   Square,
   Save,
-  Loader2,
 } from "lucide-react";
 import PageMeta from "../../components/common/PageMeta";
 import {
@@ -199,10 +198,37 @@ export default function UserRolesPage() {
 
   if (loading) {
     return (
-      <div className="bg-[#fcfdff] min-h-screen flex items-center justify-center">
-        <div className="flex items-center gap-3 text-gray-500">
-          <Loader2 className="w-6 h-6 animate-spin" />
-          <span className="text-sm font-medium">Loading roles & permissions...</span>
+      <div className="bg-[#fcfdff] min-h-screen pb-12 animate-pulse">
+        <div className="px-4 sm:px-8 py-8 max-w-[1400px] mx-auto space-y-6">
+          <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-gray-200" />
+            <div className="space-y-2">
+              <div className="h-5 w-56 rounded bg-gray-200" />
+              <div className="h-3 w-80 rounded bg-gray-100" />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <div className="lg:col-span-4 bg-white rounded-3xl p-6 border border-gray-200 shadow-sm space-y-4">
+              <div className="h-5 w-32 rounded bg-gray-200" />
+              <div className="h-10 w-full rounded-2xl bg-gray-100" />
+              <div className="h-9 w-24 rounded-xl bg-gray-200 ml-auto" />
+            </div>
+            <div className="lg:col-span-8 bg-white rounded-3xl p-6 border border-gray-200 shadow-sm space-y-4">
+              <div className="flex justify-between items-center pb-3 border-b border-gray-100">
+                <div className="h-5 w-36 rounded bg-gray-200" />
+                <div className="h-9 w-56 rounded-2xl bg-gray-100" />
+              </div>
+              {Array.from({ length: 5 }).map((_, idx) => (
+                <div key={idx} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
+                  <div className="h-4 w-36 rounded bg-gray-200" />
+                  <div className="flex gap-2">
+                    <div className="h-8 w-32 rounded-lg bg-gray-200" />
+                    <div className="h-8 w-8 rounded-lg bg-gray-100" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     );

@@ -9,7 +9,7 @@ import { DeepSearchDocument } from "../../interfaces/document";
 import { useState } from "react";
 
 interface DeepSearchFilterProps {
-    onSearch: (data: DeepSearchDocument) => void;
+    onSearch: (data: DeepSearchDocument) => void | Promise<unknown>;
     isSearching?: boolean;
     filterChain?: string[];
     currentText?: string;
@@ -62,7 +62,7 @@ const DeepSearchFilter = forwardRef(
         };
 
         const handleSubmit = () => {
-            onSearch(form);
+            return onSearch(form);
         };
 
         const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

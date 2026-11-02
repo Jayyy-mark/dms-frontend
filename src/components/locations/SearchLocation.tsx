@@ -79,7 +79,7 @@ const Searchlocation = forwardRef(({ onSearch }: any, ref) => {
 
 
     const handleSubmit = () => {
-        onSearch(form);
+        return onSearch(form);
     };
 
     const dateRef = useRef<any>(null);

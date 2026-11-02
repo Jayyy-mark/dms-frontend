@@ -10,11 +10,13 @@ import Select from "react-select";
 
 export default function Categories() {
   const [categorys, setCategories] = useState<Category[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState<AddCategory>({ category_name: "", parent_id: "" });
 
   const fetchAll = async () => {
+    setIsLoading(true);
     try {
       const data = await categoryApi.all();
       let items = data?.categorys || data?.categories || data;
@@ -24,6 +26,8 @@ export default function Categories() {
       setCategories(items);
     } catch (error: any) {
       toast.error(error?.message || "Failed to fetch lists");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -63,28 +67,28 @@ export default function Categories() {
             <div className="p-3.5 bg-[#FEF3C7] rounded-full text-[#B88E2F]"><FolderTree size={22} /></div>
             <div>
               <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Total Categories</p>
-              <h3 className="text-[28px] font-extrabold text-[#0f172a] mt-0.5 leading-none">{total}</h3>
+              <h3 className="text-[28px] font-extrabold text-[#0f172a] mt-0.5 leading-none">{isLoading ? <span className="inline-block h-7 w-16 rounded-lg bg-gray-200 animate-pulse" /> : total}</h3>
             </div>
           </div>
           <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-[0_2px_20px_-8px_rgba(0,0,0,0.05)] flex items-center gap-5">
             <div className="p-3.5 bg-[#eff6ff] rounded-full text-[#3b82f6]"><Folder size={22} /></div>
             <div>
               <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Main Categories</p>
-              <h3 className="text-[28px] font-extrabold text-[#0f172a] mt-0.5 leading-none">{parentCount}</h3>
+              <h3 className="text-[28px] font-extrabold text-[#0f172a] mt-0.5 leading-none">{isLoading ? <span className="inline-block h-7 w-16 rounded-lg bg-gray-200 animate-pulse" /> : parentCount}</h3>
             </div>
           </div>
           <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-[0_2px_20px_-8px_rgba(0,0,0,0.05)] flex items-center gap-5">
             <div className="p-3.5 bg-[#f0fdf4] rounded-full text-[#22c55e]"><FolderOpen size={22} /></div>
             <div>
               <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Subcategories</p>
-              <h3 className="text-[28px] font-extrabold text-[#0f172a] mt-0.5 leading-none">{subCount}</h3>
+              <h3 className="text-[28px] font-extrabold text-[#0f172a] mt-0.5 leading-none">{isLoading ? <span className="inline-block h-7 w-16 rounded-lg bg-gray-200 animate-pulse" /> : subCount}</h3>
             </div>
           </div>
         </div>
 
         {/* Table Section */}
         <div>
-          <CategoryTable categorys={safeCategories} setCategories={setCategories} />
+          <CategoryTable categorys={safeCategories} setCategories={setCategories} isLoading={isLoading} />
         </div>
       </div>
 

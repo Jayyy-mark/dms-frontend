@@ -20,9 +20,10 @@ interface KPICardProps {
   icon: React.ReactNode;
   accent: string;
   iconBg: string;
+  isLoading?: boolean;
 }
 
-function KPICard({ label, value, icon, accent, iconBg }: KPICardProps) {
+function KPICard({ label, value, icon, accent, iconBg, isLoading }: KPICardProps) {
   return (
     <div
       className={`relative flex items-center gap-4 overflow-hidden rounded-2xl border border-gray-100 bg-white p-4 shadow-2xs transition-all duration-200 hover:shadow-md dark:border-gray-800 dark:bg-gray-900 md:px-5 md:py-4`}
@@ -35,9 +36,13 @@ function KPICard({ label, value, icon, accent, iconBg }: KPICardProps) {
         <p className="truncate text-[11px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-400">
           {label}
         </p>
-        <h3 className="mt-0.5 text-xl font-extrabold text-gray-900 dark:text-white">
-          {value}
-        </h3>
+        {isLoading ? (
+          <div className="mt-1.5 h-6 w-24 rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse" />
+        ) : (
+          <h3 className="mt-0.5 text-xl font-extrabold text-gray-900 dark:text-white">
+            {value}
+          </h3>
+        )}
       </div>
     </div>
   );
@@ -114,35 +119,35 @@ export default function OverviewKPICards() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KPICard
           label={t("MOGE စနစ်အသုံးပြုသူများ")}
-          value={isLoading ? "..." : `${formatCount(analytics?.users)} ${t("ဦး")}`}
+          value={`${formatCount(analytics?.users)} ${t("ဦး")}`}
           accent="bg-teal-500"
           iconBg="bg-teal-50 dark:bg-teal-500/10"
           icon={<Users className="h-5 w-5 text-teal-600 dark:text-teal-400" />}
+          isLoading={isLoading}
         />
         <KPICard
           label={t("ဝန်ထမ်းစုစုပေါင်း")}
-          value={isLoading ? "..." : `${formatCount(analytics?.staffs)} ${t("ဦး")}`}
+          value={`${formatCount(analytics?.staffs)} ${t("ဦး")}`}
           accent="bg-[#B88E2F]"
           iconBg="bg-amber-50 dark:bg-amber-500/10"
           icon={<UserCheck className="h-5 w-5 text-[#B88E2F] dark:text-amber-400" />}
+          isLoading={isLoading}
         />
         <KPICard
           label={t("စာတွဲနှင့် မော်ကွန်း")}
-          value={isLoading ? "..." : `${formatCount(analytics?.documents)} ${t("စောင်")}`}
+          value={`${formatCount(analytics?.documents)} ${t("စောင်")}`}
           accent="bg-indigo-500"
           iconBg="bg-indigo-50 dark:bg-indigo-500/10"
           icon={<Archive className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />}
+          isLoading={isLoading}
         />
         <KPICard
           label={t("အဆောက်အဦးနှင့် နေရာများ")}
-          value={
-            isLoading
-              ? "..."
-              : `${formatCount(analytics?.buildings)} ${t("ကွင်း")} / ${formatCount(analytics?.departments)} ${t("ရုံး")}`
-          }
+          value={`${formatCount(analytics?.buildings)} ${t("ကွင်း")} / ${formatCount(analytics?.departments)} ${t("ရုံး")}`}
           accent="bg-cyan-500"
           iconBg="bg-cyan-50 dark:bg-cyan-500/10"
           icon={<Building2 className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />}
+          isLoading={isLoading}
         />
       </div>
 
@@ -163,9 +168,13 @@ export default function OverviewKPICards() {
                   {item.label}
                 </span>
               </div>
-              <span className="text-xs font-extrabold text-gray-900 dark:text-white shrink-0 ml-2">
-                {item.count}
-              </span>
+              {isLoading ? (
+                <div className="h-4 w-12 rounded bg-gray-200 dark:bg-gray-700 animate-pulse shrink-0 ml-2" />
+              ) : (
+                <span className="text-xs font-extrabold text-gray-900 dark:text-white shrink-0 ml-2">
+                  {item.count}
+                </span>
+              )}
             </div>
           );
         })}

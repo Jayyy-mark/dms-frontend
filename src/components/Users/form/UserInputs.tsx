@@ -17,9 +17,10 @@ import { parseApiError } from "../../../helpers/parseApiError.ts";
 import { getStoredUserRoles, USER_ROLES_CHANGE_EVENT, UserRoleItem } from "../../../utils/userRoleManager.ts";
 import { userRoleApi } from "../../../api/userRoleApi.ts";
 import { useEffect, useMemo } from "react";
+import ActionButton from "../../ui/button/ActionButton.tsx";
 
 // Roles that do NOT require a linked staff / department on creation
-const PRIVILEGED_ROLES = new Set(["super admin", "admin", "super_admin"]);
+const PRIVILEGED_ROLES = new Set(["super admin", "admin", "super_admin", "superadmin"]);
 
 export default function AddUserFormComponent() {
   const { t } = useTranslation();
@@ -68,10 +69,11 @@ export default function AddUserFormComponent() {
   });
 
   // Is the selected role a privileged one (staff not required)?
-  const isPrivilegedRole = form.role ? PRIVILEGED_ROLES.has(form.role) : false;
+  const normalizedRole = form.role ? form.role.trim().toLowerCase() : "";
+  const isPrivilegedRole = normalizedRole ? PRIVILEGED_ROLES.has(normalizedRole) : false;
 
-  // Staff field is required only when a non-privileged role is selected
-  const staffRequired = form.role !== "" && !isPrivilegedRole;
+  // Staff field is required only when a non-privileged role (e.g. user) is selected
+  const staffRequired = normalizedRole !== "" && !isPrivilegedRole;
   const staffMissing = staffRequired && !form.staff_id;
 
   const handleSubmit = async () => {
@@ -149,12 +151,12 @@ export default function AddUserFormComponent() {
             options={roleOptions}
             value={roleOptions.find((o: { value: string; label: string }) => o.value === form.role) ?? null}
             onChange={(option: any) => {
+              const nextRole = (option?.value ?? "").trim().toLowerCase();
               setForm((prev) => ({
                 ...prev,
                 role: option?.value ?? "",
                 // Clear staff when switching roles so validation re-evaluates
-                staff_id: PRIVILEGED_ROLES.has(option?.value ?? "") ? prev.staff_id : "",
-                email: PRIVILEGED_ROLES.has(option?.value ?? "") ? prev.email : "",
+                staff_id: PRIVILEGED_ROLES.has(nextRole) ? prev.staff_id : "",
               }));
               clearFieldError("role");
               clearFieldError("staff_id");
@@ -290,8 +292,9 @@ export default function AddUserFormComponent() {
 
         {/* Submit Button */}
         <div className="md:col-span-2 flex justify-end">
-          <button
+          <ActionButton
             onClick={handleSubmit}
+            loadingText={`${t("Create User")}...`}
             className="
               flex items-center gap-2
               px-4 py-2
@@ -320,7 +323,7 @@ export default function AddUserFormComponent() {
               />
             </svg>
             {t("Create User")}
-          </button>
+          </ActionButton>
         </div>
 
       </div>

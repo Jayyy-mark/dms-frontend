@@ -4,6 +4,7 @@ import { Bot, FileText, LucideSend, Paperclip, SkipForward, Trash2, ExternalLink
 import { useState, useEffect, useRef } from "react";
 import { chatApi, SourceDocument, HistoryMessage } from "../../api/chatApi";
 import { API_SERVER } from "../../helpers/api";
+import ActionButton from "../ui/button/ActionButton";
 
 type Message = {
   id: number;
@@ -73,7 +74,7 @@ export default function ChatCard({
   };
 
   const sendMessage = async () => {
-    if ((!input.trim() && !file) || isUploading) return;
+    if ((!input.trim() && !file) || isUploading || isTyping) return;
 
     const userMsg: Message = {
       id: Date.now(),
@@ -380,14 +381,14 @@ export default function ChatCard({
               </button>
             )}
 
-            <button
+            <ActionButton
               onClick={sendMessage}
-              disabled={isUploading}
-              className={`p-2.5 rounded-lg text-white font-medium transition ${isUploading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 shadow-sm'}`}
+              disabled={isUploading || isTyping}
+              className={`p-2.5 rounded-lg text-white font-medium transition ${isUploading || isTyping ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 shadow-sm'}`}
               title="Send message"
             >
               <LucideSend size={18} />
-            </button>
+            </ActionButton>
           </div>
         </div>
       </div>

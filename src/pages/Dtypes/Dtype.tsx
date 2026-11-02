@@ -9,11 +9,13 @@ import { parseApiError } from "../../helpers/parseApiError";
 
 export default function Dtypes() {
   const [dtypes, setDtypes] = useState<Dtype[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState<AddDtype>({ dtype_name: "" });
 
   const fetchAll = async () => {
+    setIsLoading(true);
     try {
       const data = await dtypeApi.all();
       let items = data?.dtypes || data?.data || data;
@@ -23,6 +25,8 @@ export default function Dtypes() {
       setDtypes(items);
     } catch (error: any) {
       toast.error(error?.message || "Failed to fetch lists");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -59,14 +63,14 @@ export default function Dtypes() {
             <div className="p-3.5 bg-[#FEF3C7] rounded-full text-[#B88E2F]"><Layers size={22} /></div>
             <div>
               <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Total Types</p>
-              <h3 className="text-[28px] font-extrabold text-[#0f172a] mt-0.5 leading-none">{total}</h3>
+              <h3 className="text-[28px] font-extrabold text-[#0f172a] mt-0.5 leading-none">{isLoading ? <span className="inline-block h-7 w-16 rounded-lg bg-gray-200 animate-pulse" /> : total}</h3>
             </div>
           </div>
         </div>
 
         {/* Table Section */}
         <div>
-          <DtypeTable dtypes={safeDtypes} setDtypes={setDtypes} />
+          <DtypeTable dtypes={safeDtypes} setDtypes={setDtypes} isLoading={isLoading} />
         </div>
       </div>
 

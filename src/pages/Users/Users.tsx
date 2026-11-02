@@ -9,14 +9,18 @@ import { Download, Plus, Users as UsersIcon, ShieldCheck, UserCheck, UserX } fro
 
 export default function Users() {
   const [users, setUsers] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
   const fetchAllUsers = async () => {
+    setIsLoading(true);
     try {
       const data = await userApi.all();
       setUsers(data.users);
     } catch (error: any) {
       toast.error(error?.message || "Failed to fetch users");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -58,34 +62,34 @@ export default function Users() {
             <div className="p-3.5 bg-[#FEF3C7] rounded-full text-[#B88E2F]"><UsersIcon size={22} /></div>
             <div>
               <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Total Users</p>
-              <h3 className="text-[28px] font-extrabold text-[#0f172a] mt-0.5 leading-none">{totalUsers}</h3>
+              <h3 className="text-[28px] font-extrabold text-[#0f172a] mt-0.5 leading-none">{isLoading ? <span className="inline-block h-7 w-16 rounded-lg bg-gray-200 animate-pulse" /> : totalUsers}</h3>
             </div>
           </div>
           <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-[0_2px_20px_-8px_rgba(0,0,0,0.05)] flex items-center gap-5">
             <div className="p-3.5 bg-[#eff6ff] rounded-full text-[#3b82f6]"><ShieldCheck size={22} /></div>
             <div>
               <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Admins</p>
-              <h3 className="text-[28px] font-extrabold text-[#0f172a] mt-0.5 leading-none">{adminUsers}</h3>
+              <h3 className="text-[28px] font-extrabold text-[#0f172a] mt-0.5 leading-none">{isLoading ? <span className="inline-block h-7 w-16 rounded-lg bg-gray-200 animate-pulse" /> : adminUsers}</h3>
             </div>
           </div>
           <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-[0_2px_20px_-8px_rgba(0,0,0,0.05)] flex items-center gap-5">
             <div className="p-3.5 bg-[#f0fdf4] rounded-full text-[#22c55e]"><UserCheck size={22} /></div>
             <div>
               <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Active</p>
-              <h3 className="text-[28px] font-extrabold text-[#0f172a] mt-0.5 leading-none">{activeUsers}</h3>
+              <h3 className="text-[28px] font-extrabold text-[#0f172a] mt-0.5 leading-none">{isLoading ? <span className="inline-block h-7 w-16 rounded-lg bg-gray-200 animate-pulse" /> : activeUsers}</h3>
             </div>
           </div>
           <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-[0_2px_20px_-8px_rgba(0,0,0,0.05)] flex items-center gap-5">
             <div className="p-3.5 bg-[#fef2f2] rounded-full text-[#ef4444]"><UserX size={22} /></div>
             <div>
               <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Banned</p>
-              <h3 className="text-[28px] font-extrabold text-[#0f172a] mt-0.5 leading-none">{bannedUsers}</h3>
+              <h3 className="text-[28px] font-extrabold text-[#0f172a] mt-0.5 leading-none">{isLoading ? <span className="inline-block h-7 w-16 rounded-lg bg-gray-200 animate-pulse" /> : bannedUsers}</h3>
             </div>
           </div>
         </div>
 
         {/* Table Section */}
-        <UserTable users={users} setUsers={setUsers} />
+        <UserTable users={users} setUsers={setUsers} isLoading={isLoading} />
       </div>
     </div>
   );

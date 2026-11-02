@@ -20,6 +20,7 @@ import { useSelectOptions } from "../../hooks/useSelectOptions";
 import { helper } from "../../helpers/utils";
 import { useFormErrors } from "../../hooks/useFormErrors";
 import { parseApiError } from "../../helpers/parseApiError";
+import ActionButton from "../ui/button/ActionButton";
 
 interface PhotoPreviewItem {
   file: File;
@@ -662,13 +663,14 @@ export default function AddLocationForm() {
         >
           {t("Cancel")}
         </button>
-        <button
+        <ActionButton
           type="button"
           onClick={handleSubmit}
+          loadingText={`${t("Create Activity Record")}...`}
           className="px-6 py-2.5 bg-[#B88E2F] hover:bg-[#997524] text-white text-xs font-bold rounded-2xl transition shadow-md shadow-amber-200 flex items-center gap-2"
         >
           <Plus size={16} /> {t("Create Activity Record")}
-        </button>
+        </ActionButton>
       </div>
 
       {/* Interactive Map Selector Modal */}

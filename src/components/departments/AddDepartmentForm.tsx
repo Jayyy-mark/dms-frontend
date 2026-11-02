@@ -13,6 +13,7 @@ import { Room } from "../../interfaces/room";
 import Select from "../form/Select.tsx";
 import { useFormErrors } from "../../hooks/useFormErrors.ts";
 import { parseApiError } from "../../helpers/parseApiError.ts";
+import ActionButton from "../ui/button/ActionButton";
 
 export default function AddDepartmentForm() {
   const { t } = useTranslation();
@@ -87,8 +88,9 @@ export default function AddDepartmentForm() {
                 />
                 </div>                
                 <div className="md:col-span-3 flex">
-                    <button
+                    <ActionButton
                         onClick={handleSubmit}
+                        loadingText={`${t("Create department")}...`}
                         className="
       flex items-center gap-2 
       px-4 py-2 
@@ -117,7 +119,7 @@ export default function AddDepartmentForm() {
                             />
                         </svg>
                         {t("Create department")}
-                    </button>
+                    </ActionButton>
                 </div>
             </div>
         </ComponentCard>

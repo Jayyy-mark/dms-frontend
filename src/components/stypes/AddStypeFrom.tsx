@@ -10,6 +10,7 @@ import { useNavigate } from "react-router";
 import { toast } from "react-toastify";
 import { useFormErrors } from "../../hooks/useFormErrors.ts";
 import { parseApiError } from "../../helpers/parseApiError.ts";
+import ActionButton from "../ui/button/ActionButton";
 
 export default function AddStypeForm() {
     const { t } = useTranslation();
@@ -51,8 +52,9 @@ export default function AddStypeForm() {
                 </div>
 
                 <div className="md:col-span-3 flex">
-                    <button
+                    <ActionButton
                         onClick={handleSubmit}
+                        loadingText={`${t("Create stype")}...`}
                         className="
       flex items-center gap-2 
       px-4 py-2 
@@ -81,7 +83,7 @@ export default function AddStypeForm() {
                             />
                         </svg>
                         {t("Create stype")}
-                    </button>
+                    </ActionButton>
                 </div>
             </div>
         </ComponentCard>

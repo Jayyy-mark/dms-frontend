@@ -129,23 +129,39 @@ export default function DashboardLocationsTab() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-2xs dark:border-gray-800 dark:bg-gray-900">
             <p className="text-[11px] font-bold uppercase text-gray-400">Total Locations</p>
-            <h3 className="text-xl font-extrabold text-gray-900 dark:text-white mt-1">{locations.length}</h3>
+            {loading ? (
+              <div className="h-7 w-16 rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse mt-1" />
+            ) : (
+              <h3 className="text-xl font-extrabold text-gray-900 dark:text-white mt-1">{locations.length}</h3>
+            )}
           </div>
           <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-2xs dark:border-gray-800 dark:bg-gray-900">
             <p className="text-[11px] font-bold uppercase text-gray-400">Office Buildings</p>
-            <h3 className="text-xl font-extrabold text-[#B88E2F] dark:text-amber-400 mt-1">{buildings.length}</h3>
+            {loading ? (
+              <div className="h-7 w-16 rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse mt-1" />
+            ) : (
+              <h3 className="text-xl font-extrabold text-[#B88E2F] dark:text-amber-400 mt-1">{buildings.length}</h3>
+            )}
           </div>
           <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-2xs dark:border-gray-800 dark:bg-gray-900">
             <p className="text-[11px] font-bold uppercase text-gray-400">Offshore Fields</p>
-            <h3 className="text-xl font-extrabold text-rose-600 dark:text-rose-400 mt-1">
-              {locations.filter(l => l.location_type?.toLowerCase().includes("offshore")).length}
-            </h3>
+            {loading ? (
+              <div className="h-7 w-16 rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse mt-1" />
+            ) : (
+              <h3 className="text-xl font-extrabold text-rose-600 dark:text-rose-400 mt-1">
+                {locations.filter(l => l.location_type?.toLowerCase().includes("offshore")).length}
+              </h3>
+            )}
           </div>
           <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-2xs dark:border-gray-800 dark:bg-gray-900">
             <p className="text-[11px] font-bold uppercase text-gray-400">Onshore Fields</p>
-            <h3 className="text-xl font-extrabold text-teal-600 dark:text-teal-400 mt-1">
-              {locations.filter(l => l.location_type?.toLowerCase().includes("onshore")).length}
-            </h3>
+            {loading ? (
+              <div className="h-7 w-16 rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse mt-1" />
+            ) : (
+              <h3 className="text-xl font-extrabold text-teal-600 dark:text-teal-400 mt-1">
+                {locations.filter(l => l.location_type?.toLowerCase().includes("onshore")).length}
+              </h3>
+            )}
           </div>
         </div>
       </div>
@@ -274,8 +290,22 @@ export default function DashboardLocationsTab() {
           </div>
 
           {loading ? (
-            <div className="flex h-48 items-center justify-center">
-              <RefreshCw className="h-6 w-6 animate-spin text-teal-400" />
+            <div className="space-y-3 animate-pulse">
+              {Array.from({ length: 5 }).map((_, idx) => (
+                <div
+                  key={`loc-skel-${idx}`}
+                  className="flex items-center gap-3.5 rounded-2xl border border-gray-100 bg-gray-50/60 p-4 dark:border-gray-800 dark:bg-gray-800/40"
+                >
+                  <div className="h-12 w-12 shrink-0 rounded-xl bg-gray-200 dark:bg-gray-700" />
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="h-3.5 w-32 rounded bg-gray-200 dark:bg-gray-700" />
+                      <div className="h-4 w-16 rounded-full bg-gray-200 dark:bg-gray-700" />
+                    </div>
+                    <div className="h-3 w-24 rounded bg-gray-100 dark:bg-gray-800" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : filtered.length === 0 ? (
             <p className="py-12 text-center text-xs text-gray-400">တည်နေရာများ မတွေ့ရှိပါ</p>
@@ -339,8 +369,20 @@ export default function DashboardLocationsTab() {
           </div>
 
           {loading ? (
-            <div className="flex h-48 items-center justify-center">
-              <RefreshCw className="h-6 w-6 animate-spin text-indigo-400" />
+            <div className="space-y-3 animate-pulse">
+              {Array.from({ length: 5 }).map((_, idx) => (
+                <div
+                  key={`bldg-skel-${idx}`}
+                  className="flex items-center gap-3.5 rounded-2xl border border-gray-100 bg-gray-50/60 p-4 dark:border-gray-800 dark:bg-gray-800/40"
+                >
+                  <div className="h-10 w-10 shrink-0 rounded-xl bg-gray-200 dark:bg-gray-700" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="h-3.5 w-36 rounded bg-gray-200 dark:bg-gray-700" />
+                    <div className="h-3 w-20 rounded bg-gray-100 dark:bg-gray-800" />
+                  </div>
+                  <div className="h-6 w-16 rounded-full bg-gray-200 dark:bg-gray-700 shrink-0" />
+                </div>
+              ))}
             </div>
           ) : buildings.length === 0 ? (
             <p className="py-12 text-center text-xs text-gray-400">ရုံးအဆောက်အဦးများ မရှိသေးပါ</p>

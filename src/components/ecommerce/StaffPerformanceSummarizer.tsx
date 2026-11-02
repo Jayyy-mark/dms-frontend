@@ -107,9 +107,13 @@ export default function StaffPerformanceSummarizer() {
 
         <div className="flex-1 flex flex-col justify-center items-center py-4 relative">
           <div className="absolute inset-0 bg-indigo-50/50 dark:bg-indigo-900/10 rounded-full blur-3xl -z-10"></div>
-          <span className="text-5xl font-black text-gray-800 dark:text-white mb-2 tracking-tight">
-            {isLoading ? "..." : currentStaffCount.toLocaleString()}
-          </span>
+          {isLoading ? (
+            <div className="h-12 w-28 rounded-xl bg-gray-200 dark:bg-gray-700 animate-pulse mb-2" />
+          ) : (
+            <span className="text-5xl font-black text-gray-800 dark:text-white mb-2 tracking-tight">
+              {currentStaffCount.toLocaleString()}
+            </span>
+          )}
           <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">
             {t("Total Staff Members")}
           </span>
@@ -119,9 +123,13 @@ export default function StaffPerformanceSummarizer() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
             </span>
-            <span className="text-xs font-bold">
-              {isLoading ? "..." : (performance?.active_users ?? 0).toLocaleString()} {t("Active System Users")}
-            </span>
+            {isLoading ? (
+              <div className="h-4 w-28 rounded bg-emerald-200/70 dark:bg-emerald-700/40 animate-pulse" />
+            ) : (
+              <span className="text-xs font-bold">
+                {(performance?.active_users ?? 0).toLocaleString()} {t("Active System Users")}
+              </span>
+            )}
           </div>
         </div>
       </div>

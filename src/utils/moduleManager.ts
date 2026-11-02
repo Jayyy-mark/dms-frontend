@@ -11,13 +11,6 @@ export interface AppModule {
 export const DEFAULT_MODULES: AppModule[] = [
   // HR Category
   { id: "employees", name: "Employees", myanmarName: "ဝန်ထမ်းများ", category: "HR", description: "Manage staff records and employee details", enabled: true, paths: ["/hr/employees", "/staff/register", "/staffs/"] },
-  { id: "promotions", name: "Promotions", myanmarName: "ရာထူးတိုး", category: "HR", description: "Employee promotion tracking and management", enabled: true, paths: ["/hr/promotions"] },
-  { id: "transfers", name: "Transfers", myanmarName: "ပြောင်းရွှေ့", category: "HR", description: "Employee department/location transfers", enabled: true, paths: ["/hr/transfers"] },
-  { id: "training", name: "Training", myanmarName: "သင်တန်း", category: "HR", description: "Staff training courses and schedules", enabled: true, paths: ["/hr/training"] },
-  { id: "overseas", name: "Overseas Travel", myanmarName: "နိုင်ငံခြားခရီးစဉ်", category: "HR", description: "Overseas duty and travel logs", enabled: true, paths: ["/hr/overseas"] },
-  { id: "awards", name: "Awards", myanmarName: "ဆုတံဆိပ်များ", category: "HR", description: "Employee honors and awards records", enabled: true, paths: ["/hr/awards"] },
-  { id: "punishments", name: "Punishments", myanmarName: "ပြစ်ဒဏ်များ", category: "HR", description: "Disciplinary actions and punishments", enabled: true, paths: ["/hr/punishments"] },
-  { id: "reports", name: "HR Reports", myanmarName: "အစီရင်ခံစာများ", category: "HR", description: "HR analytics and summary reports", enabled: true, paths: ["/hr/reports"] },
   { id: "staff_types", name: "Staff Types", myanmarName: "ဝန်ထမ်းအမျိုးအစားများ", category: "HR", description: "Manage staff type classifications", enabled: true, paths: ["/stypes/"] },
   { id: "roles", name: "Roles", myanmarName: "ရာထူး/အခန်းကဏ္ဍများ", category: "HR", description: "User and staff role permissions", enabled: true, paths: ["/roles/"] },
   { id: "ranks", name: "Ranks", myanmarName: "အဆင့်အတန်းများ", category: "HR", description: "Official rank designations", enabled: true, paths: ["/ranks/"] },

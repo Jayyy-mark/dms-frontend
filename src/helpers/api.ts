@@ -8,6 +8,7 @@ const api = axios.create({
 });
 
 let refreshPromise: Promise<AxiosResponse> | null = null;
+const inFlightMutations = new Map<string, Promise<AxiosResponse>>();
 
 const getRequestPath = (url?: string) => {
     if (!url) return "";
@@ -18,6 +19,64 @@ const getRequestPath = (url?: string) => {
         return url;
     }
 };
+
+const runDeduplicatedMutation = <T = unknown>(
+    method: string,
+    url: string,
+    executor: () => Promise<AxiosResponse<T>>
+): Promise<AxiosResponse<T>> => {
+    const key = `${method.toUpperCase()}:${getRequestPath(url)}`;
+    const existing = inFlightMutations.get(key) as Promise<AxiosResponse<T>> | undefined;
+    if (existing) {
+        return existing;
+    }
+
+    const promise = executor().finally(() => {
+        inFlightMutations.delete(key);
+    });
+    inFlightMutations.set(key, promise as Promise<AxiosResponse>);
+    return promise;
+};
+
+const originalPost = api.post.bind(api);
+const originalPut = api.put.bind(api);
+const originalPatch = api.patch.bind(api);
+const originalDelete = api.delete.bind(api);
+
+api.post = (<T = any, R = AxiosResponse<T>, D = any>(
+    url: string,
+    data?: D,
+    config?: AxiosRequestConfig<D>
+): Promise<R> =>
+    runDeduplicatedMutation<T>("POST", url, () =>
+        originalPost<T, AxiosResponse<T>, D>(url, data, config)
+    ) as unknown as Promise<R>) as typeof api.post;
+
+api.put = (<T = any, R = AxiosResponse<T>, D = any>(
+    url: string,
+    data?: D,
+    config?: AxiosRequestConfig<D>
+): Promise<R> =>
+    runDeduplicatedMutation<T>("PUT", url, () =>
+        originalPut<T, AxiosResponse<T>, D>(url, data, config)
+    ) as unknown as Promise<R>) as typeof api.put;
+
+api.patch = (<T = any, R = AxiosResponse<T>, D = any>(
+    url: string,
+    data?: D,
+    config?: AxiosRequestConfig<D>
+): Promise<R> =>
+    runDeduplicatedMutation<T>("PATCH", url, () =>
+        originalPatch<T, AxiosResponse<T>, D>(url, data, config)
+    ) as unknown as Promise<R>) as typeof api.patch;
+
+api.delete = (<T = any, R = AxiosResponse<T>, D = any>(
+    url: string,
+    config?: AxiosRequestConfig<D>
+): Promise<R> =>
+    runDeduplicatedMutation<T>("DELETE", url, () =>
+        originalDelete<T, AxiosResponse<T>, D>(url, config)
+    ) as unknown as Promise<R>) as typeof api.delete;
 
 const isAuthEndpoint = (url?: string) => {
     const path = getRequestPath(url);

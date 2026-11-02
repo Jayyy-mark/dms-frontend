@@ -1,9 +1,11 @@
-import { ReactHTMLElement, ReactNode } from "react";
+import { ReactNode } from "react";
 
-export interface ButtonProps extends ReactHTMLElement<HTMLButtonElement>{
-    variant?: "primary" | "danger" | "warning" | "info";
-    icon?:ReactNode;
-    children:ReactNode;
-    disabled:boolean;
-    onClick:()=>void;
+export interface ButtonProps {
+  variant?: "primary" | "danger" | "warning" | "info" | "success" | "light" | "dark";
+  icon?: ReactNode;
+  children: ReactNode;
+  disabled?: boolean;
+  loading?: boolean;
+  loadingText?: ReactNode;
+  onClick?: () => unknown | Promise<unknown>;
 }

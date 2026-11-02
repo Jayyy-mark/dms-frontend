@@ -13,6 +13,7 @@ import { Building } from "../../interfaces/building";
 import Select from "../form/Select.tsx";
 import { useFormErrors } from "../../hooks/useFormErrors.ts";
 import { parseApiError } from "../../helpers/parseApiError.ts";
+import ActionButton from "../ui/button/ActionButton";
 
 export default function AddRoomForm() {
   const { t } = useTranslation();
@@ -101,8 +102,9 @@ export default function AddRoomForm() {
                 <FieldError message={errors.building_id} />
                 </div>                
                 <div className="md:col-span-3 flex">
-                    <button
+                    <ActionButton
                         onClick={handleSubmit}
+                        loadingText={`${t("Create room")}...`}
                         className="
       flex items-center gap-2 
       px-4 py-2 
@@ -131,7 +133,7 @@ export default function AddRoomForm() {
                             />
                         </svg>
                         {t("Create room")}
-                    </button>
+                    </ActionButton>
                 </div>
             </div>
         </ComponentCard>

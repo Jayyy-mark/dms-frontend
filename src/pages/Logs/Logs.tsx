@@ -1,27 +1,17 @@
 import PageBreadCrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
 import LogTable from "../../components/logs/LogTable";
-import { useLogs } from "../../hooks/useLogs";
+import { useLogStats } from "../../hooks/useLogs";
 import { ShieldCheck } from "lucide-react";
 
 export default function Logs() {
-  const { logs, isLoading } = useLogs();
+  // Aggregated on the backend (no need to download every log row)
+  const { stats } = useLogStats();
 
-  const todayLogsCount = logs.filter(
-    (log) => new Date(log.created_at).toDateString() === new Date().toDateString()
-  ).length;
-
-  const actionCounts = logs.reduce((acc, log) => {
-    const action = log.action ? log.action.toUpperCase() : "UNKNOWN";
-    acc[action] = (acc[action] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const roleCounts = logs.reduce((acc, log) => {
-    const role = log.user?.role || "Unknown";
-    acc[role] = (acc[role] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  const totalLogsCount = stats?.total ?? 0;
+  const todayLogsCount = stats?.today ?? 0;
+  const actionCounts: Record<string, number> = stats?.actions ?? {};
+  const roleCounts: Record<string, number> = stats?.roles ?? {};
 
   return (
     <>
@@ -43,7 +33,7 @@ export default function Logs() {
               </h2>
               <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
                 <span className="flex items-center gap-1">
-                  <span className="font-medium text-gray-700 dark:text-gray-300">Total</span> {logs.length}
+                  <span className="font-medium text-gray-700 dark:text-gray-300">Total</span> {totalLogsCount}
                 </span>
                 <span>•</span>
                 <span className="flex items-center gap-1">
@@ -101,7 +91,7 @@ export default function Logs() {
 
         {/* Logs Table Section (Card Layout) */}
         <div className="mt-4">
-          <LogTable logs={logs} isLoading={isLoading} />
+          <LogTable />
         </div>
       </div>
     </>
