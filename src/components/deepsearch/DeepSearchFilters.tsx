@@ -102,7 +102,91 @@ const DeepSearchFilter = forwardRef(
         return (
             <div className="w-full">
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 ">
+                <div className="relative">
+                    <div className="flex items-center justify-between mb-1">
+                        <Label>Enter texts that you want to search :</Label>
+                        {isSearching && (
+                            <span className="text-xs text-gray-400">
+                                Press <kbd className="rounded border border-gray-200 bg-gray-100 px-1 py-0.5 text-[10px] font-mono">Enter</kbd> to narrow results further
+                            </span>
+                        )}
+                    </div>
+
+                    {filterChain.length > 0 && (
+                        <div className="mb-2 flex flex-wrap gap-1">
+                            {filterChain.map((term, i) => (
+                                <span
+                                    key={i}
+                                    className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-amber-700"
+                                >
+                                    <span className="text-blue-400 font-bold text-[10px]">#{i + 1}</span>
+                                    {term}
+                                    {onRemoveFilter && (
+                                        <button
+                                            onClick={() => onRemoveFilter(i)}
+                                            className="ml-0.5 rounded-full p-0.5 hover:bg-blue-200"
+                                        >
+                                            <X size={10} />
+                                        </button>
+                                    )}
+                                </span>
+                            ))}
+                        </div>
+                    )}
+
+                    <div className="relative">
+                        {textareaValue && (
+                            <button
+                                onClick={() => handleTextChange("")}
+                                className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 z-10"
+                            >
+                                <X size={16} />
+                            </button>
+                        )}
+
+                        {isSearching && currentText.trim() && onAddFilter && (
+                            <button
+                                onClick={() => onAddFilter(currentText)}
+                                className="absolute right-8 top-3 text-blue-400 hover:text-[#997524] z-10"
+                                title="Press Enter to commit this filter"
+                            >
+                                <CornerDownLeft size={15} />
+                            </button>
+                        )}
+
+                        <textarea
+                            value={textareaValue}
+                            onChange={(e) => handleTextChange(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            rows={isSearching && filterChain.length > 0 ? 2 : 4}
+                            placeholder={
+                                isSearching
+                                    ? filterChain.length > 0
+                                        ? `Narrow further within ${filterChain.length > 0 ? `"${filterChain[filterChain.length - 1]}"` : "current"} results... (Enter to commit)`
+                                        : "Type to filter results... (Enter to commit and narrow further)"
+                                    : "Type anything... e.g. AI IoT business plan, student attendance report, financial document..."
+                            }
+                            className="w-full resize-none rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 shadow-sm outline-none transition focus:border-[#B88E2F] focus:bg-white focus:ring-2 focus:ring-blue-100"
+                        />
+                    </div>
+
+                    {isSearching && (
+                        <p className="mt-1 text-xs text-gray-400">
+                            Typing filters instantly. Press{" "}
+                            <kbd className="rounded border border-gray-200 bg-gray-100 px-1 py-0.5 text-[10px] font-mono">Enter</kbd>
+                            {" "}to commit and layer another filter on top.
+                            {" "}Press <span className="font-semibold text-gray-500">Clear</span> to start a new search.
+                        </p>
+                    )}
+                </div>
+
+                {isSearching && (
+                    <p className="mt-4 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
+                        🔒 Filters are locked during local filtering. Press <span className="font-semibold">Clear</span> to reset and search with new filters.
+                    </p>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
 
                     <div>
                         <Label>Department</Label>
@@ -213,90 +297,6 @@ const DeepSearchFilter = forwardRef(
                     </div>
 
                 </div>
-
-                <div className="relative mt-6">
-                    <div className="flex items-center justify-between mb-1">
-                        <Label>Enter texts that you want to search :</Label>
-                        {isSearching && (
-                            <span className="text-xs text-gray-400">
-                                Press <kbd className="rounded border border-gray-200 bg-gray-100 px-1 py-0.5 text-[10px] font-mono">Enter</kbd> to narrow results further
-                            </span>
-                        )}
-                    </div>
-
-                    {filterChain.length > 0 && (
-                        <div className="mb-2 flex flex-wrap gap-1">
-                            {filterChain.map((term, i) => (
-                                <span
-                                    key={i}
-                                    className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-amber-700"
-                                >
-                                    <span className="text-blue-400 font-bold text-[10px]">#{i + 1}</span>
-                                    {term}
-                                    {onRemoveFilter && (
-                                        <button
-                                            onClick={() => onRemoveFilter(i)}
-                                            className="ml-0.5 rounded-full p-0.5 hover:bg-blue-200"
-                                        >
-                                            <X size={10} />
-                                        </button>
-                                    )}
-                                </span>
-                            ))}
-                        </div>
-                    )}
-
-                    <div className="relative">
-                        {textareaValue && (
-                            <button
-                                onClick={() => handleTextChange("")}
-                                className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 z-10"
-                            >
-                                <X size={16} />
-                            </button>
-                        )}
-
-                        {isSearching && currentText.trim() && onAddFilter && (
-                            <button
-                                onClick={() => onAddFilter(currentText)}
-                                className="absolute right-8 top-3 text-blue-400 hover:text-[#997524] z-10"
-                                title="Press Enter to commit this filter"
-                            >
-                                <CornerDownLeft size={15} />
-                            </button>
-                        )}
-
-                        <textarea
-                            value={textareaValue}
-                            onChange={(e) => handleTextChange(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            rows={isSearching && filterChain.length > 0 ? 2 : 4}
-                            placeholder={
-                                isSearching
-                                    ? filterChain.length > 0
-                                        ? `Narrow further within ${filterChain.length > 0 ? `"${filterChain[filterChain.length - 1]}"` : "current"} results... (Enter to commit)`
-                                        : "Type to filter results... (Enter to commit and narrow further)"
-                                    : "Type anything... e.g. AI IoT business plan, student attendance report, financial document..."
-                            }
-                            className="w-full resize-none rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 shadow-sm outline-none transition focus:border-[#B88E2F] focus:bg-white focus:ring-2 focus:ring-blue-100"
-                        />
-                    </div>
-
-                    {isSearching && (
-                        <p className="mt-1 text-xs text-gray-400">
-                            Typing filters instantly. Press{" "}
-                            <kbd className="rounded border border-gray-200 bg-gray-100 px-1 py-0.5 text-[10px] font-mono">Enter</kbd>
-                            {" "}to commit and layer another filter on top.
-                            {" "}Press <span className="font-semibold text-gray-500">Clear</span> to start a new search.
-                        </p>
-                    )}
-                </div>
-
-                {isSearching && (
-                    <p className="mt-4 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
-                        🔒 Filters are locked during local filtering. Press <span className="font-semibold">Clear</span> to reset and search with new filters.
-                    </p>
-                )}
 
             </div>
         );
