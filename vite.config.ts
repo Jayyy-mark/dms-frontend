@@ -1,15 +1,11 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import svgr from "vite-plugin-svgr";
-import mkcert from 'vite-plugin-mkcert';
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
-    mkcert({
-      hosts: ['localhost', '192.168.0.100']
-    }),
     svgr({
       svgrOptions: {
         icon: true,
@@ -20,7 +16,7 @@ export default defineConfig({
     }),
   ],
   server: {
-    host: '192.168.0.100',
+    host: '0.0.0.0',
     port: 5173,
   }
 });
