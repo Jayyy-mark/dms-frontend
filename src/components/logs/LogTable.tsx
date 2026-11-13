@@ -366,7 +366,12 @@ export default function LogTable() {
                                         { value: 'all', label: 'All Actions' },
                                         { value: 'CREATE', label: 'Create' },
                                         { value: 'UPDATE', label: 'Update' },
-                                        { value: 'DELETE', label: 'Delete' }
+                                        { value: 'DELETE', label: 'Delete' },
+                                        { value: 'VIEW', label: 'View' },
+                                        { value: 'DOWNLOAD', label: 'Download' },
+                                        { value: 'ARCHIVE', label: 'Archive' },
+                                        { value: 'RESTORE', label: 'Restore' },
+                                        { value: 'LOGIN', label: 'Login' },
                                     ].map((opt) => (
                                         <button
                                             key={opt.value}
@@ -538,8 +543,10 @@ export default function LogTable() {
                                             <div className="mt-1">
                                                 <span className={`inline-flex items-center text-[10px] font-extrabold px-2 py-0.5 rounded-full ${log.action?.toUpperCase() === 'DELETE' ? 'text-red-600 bg-red-50' :
                                                     log.action?.toUpperCase() === 'UPDATE' ? 'text-[#997524] bg-[#FEF3C7]' :
-                                                        log.action?.toUpperCase() === 'CREATE' ? 'text-emerald-600 bg-emerald-50' :
-                                                            'text-amber-600 bg-amber-50'
+                                                        log.action?.toUpperCase() === 'CREATE' || log.action?.toUpperCase() === 'RESTORE' ? 'text-emerald-600 bg-emerald-50' :
+                                                            log.action?.toUpperCase() === 'VIEW' ? 'text-blue-600 bg-blue-50' :
+                                                                log.action?.toUpperCase() === 'DOWNLOAD' ? 'text-teal-600 bg-teal-50' :
+                                                                    'text-amber-600 bg-amber-50'
                                                     }`}>
                                                     {log.action?.toUpperCase() || 'UNKNOWN'}
                                                 </span>

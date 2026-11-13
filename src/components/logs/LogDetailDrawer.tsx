@@ -28,7 +28,12 @@ const getActionBadgeClass = (action?: string) => {
     case "UPDATE":
       return "text-[#997524] bg-[#FEF3C7] border-amber-200";
     case "CREATE":
+    case "RESTORE":
       return "text-emerald-600 bg-emerald-50 border-emerald-200";
+    case "VIEW":
+      return "text-blue-600 bg-blue-50 border-blue-200";
+    case "DOWNLOAD":
+      return "text-teal-600 bg-teal-50 border-teal-200";
     default:
       return "text-amber-600 bg-amber-50 border-amber-200";
   }

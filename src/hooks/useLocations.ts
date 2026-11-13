@@ -27,7 +27,7 @@ export interface LocationPaginatedResponse {
     stats: LocationStats;
 }
 
-const buildLocationListKey = (params: Record<string, any>) => {
+const buildLocationListKey = (endpoint: string, params: Record<string, any>) => {
     const search = new URLSearchParams();
     Object.keys(params)
         .sort()
@@ -36,12 +36,30 @@ const buildLocationListKey = (params: Record<string, any>) => {
             if (value === undefined || value === null || value === "") return;
             search.append(key, String(value));
         });
-    return `location/list/?${search.toString()}`;
+    return `${endpoint}?${search.toString()}`;
 };
 
 export const usePaginatedLocations = (params: LocationListParams) => {
     const { data, error, isLoading, isValidating, mutate } = useSWR<LocationPaginatedResponse>(
-        buildLocationListKey(params),
+        buildLocationListKey("location/list/", params),
+        swrFetcher,
+        { keepPreviousData: true }
+    );
+
+    return {
+        locations: data?.locations || [],
+        pagination: data?.pagination,
+        stats: data?.stats,
+        error,
+        isLoading: isLoading && !data,
+        isValidating,
+        mutate,
+    };
+};
+
+export const usePaginatedRecycledLocations = (params: LocationListParams) => {
+    const { data, error, isLoading, isValidating, mutate } = useSWR<LocationPaginatedResponse>(
+        buildLocationListKey("location/recycle/list/", params),
         swrFetcher,
         { keepPreviousData: true }
     );

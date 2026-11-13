@@ -129,5 +129,13 @@ export const documentApi = {
     async getExpiredDocuments(): Promise<Document[]> {
         const res = await api.get("/document/expire/all/");
         return res.data.documents;
-    }
+    },
+    async logView(id: number): Promise<any> {
+        const res = await api.post(`document/view/${id}/`);
+        return res.data;
+    },
+    async logDownload(id: number): Promise<any> {
+        const res = await api.post(`document/download/${id}/`);
+        return res.data;
+    },
 }

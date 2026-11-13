@@ -8,6 +8,7 @@ import {
   reverseGeocode,
   MyanmarLocationInfo,
 } from "../../helpers/myanmarGeocoding";
+import { resolveOfflineTile } from "../../helpers/offlineTileCoverage";
 
 interface LocationModalProps {
   onClose: () => void;
@@ -27,6 +28,7 @@ const MYANMAR_CITIES = [
   { name: "Mandalay (မန္တလေး)", lat: 21.9588, lng: 96.0891, zoom: 12 },
   { name: "Naypyidaw (နေပြည်တော်)", lat: 19.7633, lng: 96.0785, zoom: 12 },
   { name: "Bago (ပဲခူး)", lat: 17.3221, lng: 96.4664, zoom: 12 },
+  { name: "Taungoo (တောင်ငူ)", lat: 18.9413, lng: 96.4344, zoom: 12 },
   { name: "Magway (မကွေး)", lat: 20.1544, lng: 94.9455, zoom: 12 },
   { name: "Chauk [Oil Field] (ချောက်)", lat: 20.8986, lng: 94.8219, zoom: 12 },
   { name: "Yenangyaung [Oil Field] (ရေနံချောင်း)", lat: 20.4633, lng: 94.8778, zoom: 12 },
@@ -199,15 +201,86 @@ export default function LocationModal({
 
     mapInstanceRef.current = map;
 
-    // Pure 100% offline tile layer:
-    // ONLY loads from local directory "/tiles/{z}/{x}/{y}.jpg" (ESRI World Topo tiles)
-    // NO internet requests, NO external CDN, NO OSM/CartoDB server calls
-    // maxNativeZoom: 13 ensures deeper zooms (14-18) are smoothly scaled locally
-    const offlineTileLayer = L.tileLayer("/tiles/{z}/{x}/{y}.jpg", {
-      minZoom: 4,
+    // Pure 100% offline quadtree tile layer:
+    // Loads directly from "/tiles/{z}/{x}/{y}.jpg" when available at zoom z,
+    // and seamlessly crops/scales the highest-resolution available local ancestor tile
+    // when zooming deeper (up to z=18) on any region across Myanmar.
+    const OfflineQuadtreeTileLayer = L.GridLayer.extend({
+      createTile(coords: L.Coords, done: L.DoneCallback) {
+        const tile = document.createElement("div");
+        tile.className = "leaflet-tile";
+        tile.style.width = "256px";
+        tile.style.height = "256px";
+        tile.style.overflow = "hidden";
+
+        const img = document.createElement("img");
+        img.alt = "";
+        img.setAttribute("role", "presentation");
+        img.draggable = false;
+        img.style.position = "absolute";
+        img.style.maxWidth = "none";
+        img.style.maxHeight = "none";
+        img.style.display = "block";
+        img.style.pointerEvents = "none";
+        img.style.userSelect = "none";
+
+        tile.appendChild(img);
+
+        let finished = false;
+        const finish = () => {
+          if (!finished) {
+            finished = true;
+            done(undefined, tile);
+          }
+        };
+
+        const applyTileAttempt = (maxStartZ: number) => {
+          const resolved = resolveOfflineTile(coords.z, coords.x, coords.y, maxStartZ);
+          if (!resolved) {
+            img.onload = finish;
+            img.onerror = finish;
+            img.style.left = "0px";
+            img.style.top = "0px";
+            img.style.width = "256px";
+            img.style.height = "256px";
+            img.src = OFFLINE_FALLBACK_TILE;
+            return;
+          }
+
+          const { z, x, y, scale, subX, subY } = resolved;
+          img.style.left = `${-subX * 256}px`;
+          img.style.top = `${-subY * 256}px`;
+          img.style.width = `${256 * scale}px`;
+          img.style.height = `${256 * scale}px`;
+
+          img.onload = finish;
+          img.onerror = () => {
+            if (z > 4) {
+              applyTileAttempt(z - 1);
+            } else {
+              img.onerror = finish;
+              img.style.left = "0px";
+              img.style.top = "0px";
+              img.style.width = "256px";
+              img.style.height = "256px";
+              img.src = OFFLINE_FALLBACK_TILE;
+            }
+          };
+
+          img.src = `/tiles/${z}/${x}/${y}.jpg`;
+        };
+
+        applyTileAttempt(13);
+        return tile;
+      },
+    });
+
+    const offlineTileLayer = new (OfflineQuadtreeTileLayer as any)({
+      minZoom: 5,
       maxZoom: 18,
-      maxNativeZoom: 13,
-      errorTileUrl: OFFLINE_FALLBACK_TILE,
+      tileSize: 256,
+      keepBuffer: 4,
+      updateWhenIdle: false,
       attribution: "MOGE Local Offline Map",
     });
 

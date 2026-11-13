@@ -210,6 +210,14 @@ export default function RecycleDocumentTable({
 
 
 
+    const handleViewDocument = (document: Document) => {
+        if (!document.document) return;
+        void documentApi.logView(document.id).catch(() => {});
+        window.open(`${API_SERVER}${document.document}`);
+        setOpenDropdownId(null);
+        setDropdownPos(null);
+    };
+
     const handleRestoreDocument = async (document: Document) => {
         try {
             const data = await documentApi.restoreRecycleDocument(document.id);
@@ -318,7 +326,7 @@ export default function RecycleDocumentTable({
     };
 
     return (
-        <div className="w-full">
+        <div className="w-full min-w-0">
             {/* Search and Filters Bar */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-2 mb-6">
                 {/* Search Row — full width with visible border */}
@@ -336,7 +344,7 @@ export default function RecycleDocumentTable({
                 <div className="h-px bg-gray-100 w-full"></div>
 
                 {/* Tabs row + filters + view toggle */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-3 pt-2 pb-1">
+                <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 px-3 pt-2 pb-1">
                     {/* Status tabs */}
                     <div className="flex flex-wrap items-center gap-2">
                         <ActionButton
@@ -369,7 +377,7 @@ export default function RecycleDocumentTable({
                     </div>
 
                     {/* Right side: filter buttons + count + view toggle */}
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex flex-wrap items-center gap-2">
                         {/* Categories filter */}
                         <div className="relative">
                             <ActionButton
@@ -505,11 +513,11 @@ export default function RecycleDocumentTable({
                             <div className="h-full w-1/3 bg-[#B88E2F] animate-pulse" />
                         </div>
                     )}
-                    <div className="overflow-x-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: '#cbd5e1 transparent' }}>
-                        <table className="w-full min-w-[750px] text-left border-collapse">
+                    <div className="w-full overflow-x-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: '#cbd5e1 transparent' }}>
+                        <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="border-b border-gray-100 bg-gray-50/50">
-                                    <th className="px-6 py-4 text-[11px] font-extrabold text-gray-500 uppercase tracking-widest w-10">
+                                    <th className="px-4 py-3.5 text-[11px] font-extrabold text-gray-500 uppercase tracking-widest w-10">
                                         <input
                                             type="checkbox"
                                             checked={isAllSelected}
@@ -518,20 +526,20 @@ export default function RecycleDocumentTable({
                                             className="rounded text-[#B88E2F] focus:ring-[#B88E2F] border-gray-300 w-4 h-4 cursor-pointer"
                                         />
                                     </th>
-                                    <th className="px-6 py-4 text-[11px] font-extrabold text-gray-400 uppercase tracking-widest">Document</th>
-                                    <th className="px-6 py-4 text-[11px] font-extrabold text-gray-400 uppercase tracking-widest">Category</th>
-                                    <th className="px-6 py-4 text-[11px] font-extrabold text-gray-400 uppercase tracking-widest">Status</th>
-                                    <th className="px-6 py-4 text-[11px] font-extrabold text-gray-400 uppercase tracking-widest">Staff</th>
-                                    <th className="px-6 py-4 text-[11px] font-extrabold text-gray-400 uppercase tracking-widest">Updated</th>
-                                    <th className="px-6 py-4"></th>
+                                    <th className="px-4 py-3.5 text-[11px] font-extrabold text-gray-400 uppercase tracking-widest">Document</th>
+                                    <th className="px-4 py-3.5 text-[11px] font-extrabold text-gray-400 uppercase tracking-widest">Category</th>
+                                    <th className="px-4 py-3.5 text-[11px] font-extrabold text-gray-400 uppercase tracking-widest">Status</th>
+                                    <th className="px-4 py-3.5 text-[11px] font-extrabold text-gray-400 uppercase tracking-widest">Staff</th>
+                                    <th className="px-4 py-3.5 text-[11px] font-extrabold text-gray-400 uppercase tracking-widest">Updated</th>
+                                    <th className="px-4 py-3.5"></th>
                                 </tr>
                             </thead>
                             <tbody className={`divide-y divide-gray-100 transition-opacity ${isPageLoading ? "opacity-60" : ""}`}>
                                 {isLoading ? (
                                     Array.from({ length: 8 }).map((_, idx) => (
                                         <tr key={`rec-skel-row-${idx}`} className="animate-pulse">
-                                            <td className="px-6 py-4"><div className="w-4 h-4 rounded bg-gray-200" /></td>
-                                            <td className="px-6 py-4 min-w-[250px]">
+                                            <td className="px-4 py-3.5"><div className="w-4 h-4 rounded bg-gray-200" /></td>
+                                            <td className="px-4 py-3.5 min-w-[200px]">
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-9 h-9 rounded-full bg-gray-200 shrink-0" />
                                                     <div className="space-y-1.5">
@@ -540,16 +548,16 @@ export default function RecycleDocumentTable({
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4"><div className="h-3.5 w-28 rounded bg-gray-200" /></td>
-                                            <td className="px-6 py-4"><div className="h-5 w-20 rounded-full bg-gray-100" /></td>
-                                            <td className="px-6 py-4">
+                                            <td className="px-4 py-3.5"><div className="h-3.5 w-24 rounded bg-gray-200" /></td>
+                                            <td className="px-4 py-3.5"><div className="h-5 w-20 rounded-full bg-gray-100" /></td>
+                                            <td className="px-4 py-3.5">
                                                 <div className="space-y-1.5">
                                                     <div className="h-3.5 w-24 rounded bg-gray-200" />
                                                     <div className="h-2.5 w-20 rounded bg-gray-100" />
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4"><div className="h-3.5 w-20 rounded bg-gray-200" /></td>
-                                            <td className="px-6 py-4 text-right"><div className="w-7 h-7 rounded-md bg-gray-100 ml-auto" /></td>
+                                            <td className="px-4 py-3.5"><div className="h-3.5 w-20 rounded bg-gray-200" /></td>
+                                            <td className="px-4 py-3.5 text-right"><div className="w-7 h-7 rounded-md bg-gray-100 ml-auto" /></td>
                                         </tr>
                                     ))
                                 ) : currentDocuments.map((doc) => {
@@ -563,7 +571,7 @@ export default function RecycleDocumentTable({
                                             onClick={() => setDetailDoc(doc)}
                                             className={`hover:bg-[#FEF3C7]/30 transition-colors group cursor-pointer ${selectedIds.has(doc.id) ? 'bg-[#FEF3C7]/50' : ''}`}
                                         >
-                                            <td className="px-6 py-4 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                                            <td className="px-4 py-3.5 whitespace-nowrap" onClick={e => e.stopPropagation()}>
                                                 <input
                                                     type="checkbox"
                                                     checked={selectedIds.has(doc.id)}
@@ -571,21 +579,23 @@ export default function RecycleDocumentTable({
                                                     className="rounded text-[#B88E2F] focus:ring-[#B88E2F] border-gray-300 w-4 h-4 cursor-pointer"
                                                 />
                                             </td>
-                                            <td className="px-6 py-4 min-w-[250px]">
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ${avatarClass}`}>
+                                            <td className="px-4 py-3.5 min-w-[200px] max-w-[260px]">
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${avatarClass}`}>
                                                         {nameInitial}
                                                     </div>
-                                                    <div className="flex flex-col">
-                                                        <span className="text-[14px] font-bold text-[#0f172a] truncate max-w-[200px]">{doc.document_name}</span>
-                                                        <span className="text-[12px] font-medium text-gray-400 truncate max-w-[200px]">{doc.description || "No description"}</span>
+                                                    <div className="flex flex-col min-w-0">
+                                                        <span className="text-[14px] font-bold text-[#0f172a] truncate">{doc.document_name}</span>
+                                                        <span className="text-[12px] font-medium text-gray-400 truncate">{doc.description || "No description"}</span>
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4">
-                                                <div className="text-[13px] font-bold text-gray-600 line-clamp-1">{renderCategoryPath(doc.category) || "-"}</div>
+                                            <td className="px-4 py-3.5 max-w-[160px]">
+                                                <div className="text-[13px] font-bold text-gray-600 truncate" title={renderCategoryPath(doc.category) || "-"}>
+                                                    {renderCategoryPath(doc.category) || "-"}
+                                                </div>
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
+                                            <td className="px-4 py-3.5 whitespace-nowrap">
                                                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold tracking-wide ${status === 'permanent' ? 'bg-[#f0fdf4] text-[#22c55e]' :
                                                         status === 'temporary' ? 'bg-[#eff6ff] text-[#3b82f6]' :
                                                             'bg-[#fef2f2] text-[#ef4444]'
@@ -597,14 +607,14 @@ export default function RecycleDocumentTable({
                                                     {status.toUpperCase()}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="text-[13px] font-bold text-[#0f172a]">{doc.staff?.staff_name || "-"}</div>
-                                                <div className="text-[11px] font-semibold text-gray-400">{doc.staff?.department?.department_name || "-"}</div>
+                                            <td className="px-4 py-3.5 max-w-[170px]">
+                                                <div className="text-[13px] font-bold text-[#0f172a] truncate" title={doc.staff?.staff_name || "-"}>{doc.staff?.staff_name || "-"}</div>
+                                                <div className="text-[11px] font-semibold text-gray-400 truncate" title={doc.staff?.department?.department_name || "-"}>{doc.staff?.department?.department_name || "-"}</div>
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-[13px] font-bold text-gray-500">
+                                            <td className="px-4 py-3.5 whitespace-nowrap text-[13px] font-bold text-gray-500">
                                                 {helper.formatStrDate(doc.updated_at || doc.created_at || "")}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-right" onClick={e => e.stopPropagation()}>
+                                            <td className="px-4 py-3.5 whitespace-nowrap text-right" onClick={e => e.stopPropagation()}>
                                                 <ActionButton
                                                     ref={el => { btnRefs.current[doc.id] = el; }}
                                                     onClick={(e) => toggleDropdown(doc.id, e)}
@@ -674,7 +684,7 @@ export default function RecycleDocumentTable({
                                         <div className="flex flex-col">
                                             <a
                                                 href="#"
-                                                onClick={(e) => { e.preventDefault(); window.open(`${API_SERVER}${doc.document}`); }}
+                                                onClick={(e) => { e.preventDefault(); handleViewDocument(doc); }}
                                                 className="text-[15px] font-extrabold text-[#0f172a] hover:text-[#B88E2F] transition-colors truncate max-w-[180px]"
                                             >
                                                 {doc.document_name}
@@ -698,7 +708,7 @@ export default function RecycleDocumentTable({
                                                     <div className="fixed inset-0 z-10" onClick={() => setOpenDropdownId(null)}></div>
                                                     <div className="absolute right-0 mt-1 w-40 bg-white rounded-xl shadow-[0_5px_15px_-3px_rgba(0,0,0,0.1)] border border-gray-100 z-20 py-2 animate-in fade-in zoom-in-95 duration-100">
                                                         <ActionButton
-                                                            onClick={() => { window.open(`${API_SERVER}${doc.document}`); setOpenDropdownId(null); }}
+                                                            onClick={() => handleViewDocument(doc)}
                                                             className="w-full text-left px-4 py-2 text-[13px] font-semibold text-gray-700 hover:bg-gray-50 hover:text-[#B88E2F] flex items-center transition-colors"
                                                         >
                                                             <Eye size={15} className="mr-2" /> View
@@ -771,7 +781,7 @@ export default function RecycleDocumentTable({
                             style={{ top: dropdownPos.top, right: dropdownPos.right }}
                         >
                             <ActionButton
-                                onClick={() => { window.open(`${API_SERVER}${doc.document}`); setOpenDropdownId(null); setDropdownPos(null); }}
+                                onClick={() => handleViewDocument(doc)}
                                 className="w-full text-left px-4 py-2.5 text-[13px] font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors group/item"
                             >
                                 <div className="w-7 h-7 rounded-lg bg-[#FEF3C7] flex items-center justify-center group-hover/item:bg-blue-100 transition-colors">
@@ -994,7 +1004,7 @@ export default function RecycleDocumentTable({
                             {/* Action footer */}
                             <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
                                 <ActionButton
-                                    onClick={() => window.open(`${API_SERVER}${detailDoc.document}`)}
+                                    onClick={() => handleViewDocument(detailDoc)}
                                     className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-gray-200 text-[13px] font-bold text-gray-700 hover:bg-gray-50 transition-colors"
                                 >
                                     <Eye size={15} /> View File

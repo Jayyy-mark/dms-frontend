@@ -66,6 +66,7 @@ export default function AddDocumentForm() {
       }));
     }
   }, [staff]);
+  
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { errors, validate } = useFormErrors<AddDocument>();

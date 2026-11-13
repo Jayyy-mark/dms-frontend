@@ -67,7 +67,7 @@ export default function Recycles() {
         </div>
 
         {/* Table Section */}
-        <div ref={scrollRef}>
+        <div ref={scrollRef} className="min-w-0">
           <RecycleDocumentTable
             searchRef={searchRef}
             onStatsChange={(newStats, loading) => {

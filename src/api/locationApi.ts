@@ -63,4 +63,24 @@ export const locationApi = {
         });
         return res.data;
     },
+    async getAllRecycled(): Promise<any> {
+        const res = await api.get("location/recycle/all/");
+        return res.data;
+    },
+    async restoreRecycle(id: number): Promise<any> {
+        const res = await api.patch(`location/recycle/restore/${id}/`);
+        return res.data;
+    },
+    async deleteRecycle(id: number): Promise<any> {
+        const res = await api.delete(`location/recycle/delete/${id}/`);
+        return res.data;
+    },
+    async logView(id: number): Promise<any> {
+        const res = await api.post(`location/view/${id}/`);
+        return res.data;
+    },
+    async logDownload(id: number): Promise<any> {
+        const res = await api.post(`location/download/${id}/`);
+        return res.data;
+    },
 }

@@ -10,6 +10,8 @@ import { toast } from "react-toastify";
 import ConfirmModal from "../common/ConfirmModal";
 import LocationDetailDrawer from "./LocationDetailDrawer";
 import { useEffect, useState } from "react";
+import { Download, Eye, Pencil, Trash2 } from "lucide-react";
+import { API_SERVER } from "../../helpers/api";
 
 export default function LocationTable({
   locations: propLocations,
@@ -63,8 +65,69 @@ export default function LocationTable({
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Location | null>(null);
+  const [openDropdownId, setOpenDropdownId] = useState<number | null>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; right: number } | null>(null);
+
+  const closeDropdown = () => {
+    setOpenDropdownId(null);
+    setDropdownPos(null);
+  };
+
+  const toggleDropdown = (location: Location, e: React.MouseEvent<HTMLButtonElement>) => {
+    if (openDropdownId === location.id) {
+      closeDropdown();
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const topPos = spaceBelow < 210 ? rect.top - 196 : rect.bottom + 4;
+    setDropdownPos({ top: topPos, right: window.innerWidth - rect.right });
+    setOpenDropdownId(location.id);
+  };
+
+  useEffect(() => {
+    if (openDropdownId === null) return;
+    window.addEventListener("scroll", closeDropdown, true);
+    window.addEventListener("resize", closeDropdown);
+    return () => {
+      window.removeEventListener("scroll", closeDropdown, true);
+      window.removeEventListener("resize", closeDropdown);
+    };
+  }, [openDropdownId]);
+
+  const handleViewLocation = (location: Location) => {
+    void locationApi.logView(location.id).catch(() => {});
+    if (location.photo) {
+      window.open(`${API_SERVER}${location.photo}`, "_blank");
+    } else if (location.latitude && location.longitude) {
+      window.open(`https://www.google.com/maps?q=${location.latitude},${location.longitude}`, "_blank");
+    }
+    closeDropdown();
+  };
+
+  const handleDownloadLocation = (location: Location) => {
+    closeDropdown();
+    if (!location.photo) return;
+    void locationApi.logDownload(location.id).catch(() => {});
+    fetch(`${API_SERVER}${location.photo}`)
+      .then((response) => response.blob())
+      .then((blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.style.display = "none";
+        a.href = url;
+        const photoStr = typeof location.photo === "string" ? location.photo : "";
+        const ext = photoStr ? photoStr.split(".").pop() || "jpg" : "jpg";
+        a.download = `${location.location_name || "download"}.${ext}`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+      })
+      .catch(() => window.open(`${API_SERVER}${location.photo}`, "_blank"));
+  };
 
   const handleDeleteClick = (location: Location) => {
+    closeDropdown();
     setDeleteTarget(location);
     setDeleteOpen(true);
   };
@@ -84,7 +147,34 @@ export default function LocationTable({
     }
   };
 
+  const handleBulkDelete = async (selectedLocations: Location[]) => {
+    if (selectedLocations.length === 0) return;
+
+    const results = await Promise.allSettled(
+      selectedLocations.map((loc) => locationApi.delete(loc.id))
+    );
+    const deletedIds = new Set(
+      selectedLocations
+        .filter((_, idx) => results[idx].status === "fulfilled")
+        .map((loc) => loc.id)
+    );
+    const failedCount = results.length - deletedIds.size;
+
+    if (deletedIds.size > 0) {
+      setlocations((prev) => prev.filter((loc) => !deletedIds.has(loc.id)));
+      swr.mutate();
+      toast.success(`${deletedIds.size} location(s) deleted.`);
+    }
+    if (failedCount > 0) {
+      toast.error(`Failed to delete ${failedCount} location(s).`);
+      if (deletedIds.size === 0) {
+        throw new Error("Bulk delete failed");
+      }
+    }
+  };
+
   const handleEditlocation = async (location: Location) => {
+    closeDropdown();
     navigate(`/locations/edit/${location.id}`);
   };
 
@@ -117,8 +207,9 @@ export default function LocationTable({
         <DataTable
           data={locations}
           isLoading={isLoading}
-          columns={LocationColumns(handleEditlocation, handleDeleteClick)}
+          columns={LocationColumns(toggleDropdown)}
           onExportPDF={handleExportPDF}
+          onBulkDelete={handleBulkDelete}
           serverPagination={{
             currentPage,
             itemsPerPage,
@@ -145,6 +236,61 @@ export default function LocationTable({
           )}
         />
       </div>
+      {openDropdownId !== null && dropdownPos && (() => {
+        const activeLoc = locations.find((l) => l.id === openDropdownId);
+        if (!activeLoc) return null;
+        return (
+          <>
+            <div className="fixed inset-0 z-40" onClick={closeDropdown} />
+            <div
+              className="fixed z-50 w-44 bg-white rounded-xl shadow-[0_8px_24px_-4px_rgba(0,0,0,0.15)] border border-gray-100 py-1.5"
+              style={{ top: dropdownPos.top, right: dropdownPos.right }}
+            >
+              <button
+                type="button"
+                onClick={() => handleViewLocation(activeLoc)}
+                className="w-full text-left px-4 py-2.5 text-[13px] font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors group/item"
+              >
+                <div className="w-7 h-7 rounded-lg bg-[#FEF3C7] flex items-center justify-center group-hover/item:bg-blue-100 transition-colors">
+                  <Eye size={14} className="text-[#B88E2F]" />
+                </div>
+                View
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDownloadLocation(activeLoc)}
+                className="w-full text-left px-4 py-2.5 text-[13px] font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors group/item"
+              >
+                <div className="w-7 h-7 rounded-lg bg-green-50 flex items-center justify-center group-hover/item:bg-green-100 transition-colors">
+                  <Download size={14} className="text-green-600" />
+                </div>
+                Download
+              </button>
+              <button
+                type="button"
+                onClick={() => handleEditlocation(activeLoc)}
+                className="w-full text-left px-4 py-2.5 text-[13px] font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors group/item"
+              >
+                <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center group-hover/item:bg-gray-200 transition-colors">
+                  <Pencil size={14} className="text-gray-500" />
+                </div>
+                Edit
+              </button>
+              <div className="h-px bg-gray-100 my-1 mx-3" />
+              <button
+                type="button"
+                onClick={() => handleDeleteClick(activeLoc)}
+                className="w-full text-left px-4 py-2.5 text-[13px] font-semibold text-red-500 hover:bg-red-50 flex items-center gap-3 transition-colors group/item"
+              >
+                <div className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center group-hover/item:bg-red-100 transition-colors">
+                  <Trash2 size={14} className="text-red-500" />
+                </div>
+                Delete
+              </button>
+            </div>
+          </>
+        );
+      })()}
       <ConfirmModal
         isOpen={deleteOpen}
         title="Delete location"

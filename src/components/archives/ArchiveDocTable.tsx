@@ -210,6 +210,14 @@ export default function ArchiveDocumentTable({
 
 
 
+    const handleViewDocument = (document: Document) => {
+        if (!document.document) return;
+        void documentApi.logView(document.id).catch(() => {});
+        window.open(`${API_SERVER}${document.document}`);
+        setOpenDropdownId(null);
+        setDropdownPos(null);
+    };
+
     const handleRestoreDocument = async (document: Document) => {
         try {
             const data = await documentApi.restoreArchiveDocument(document.id);
@@ -674,7 +682,7 @@ export default function ArchiveDocumentTable({
                                         <div className="flex flex-col">
                                             <a
                                                 href="#"
-                                                onClick={(e) => { e.preventDefault(); window.open(`${API_SERVER}${doc.document}`); }}
+                                                onClick={(e) => { e.preventDefault(); handleViewDocument(doc); }}
                                                 className="text-[15px] font-extrabold text-[#0f172a] hover:text-[#B88E2F] transition-colors truncate max-w-[180px]"
                                             >
                                                 {doc.document_name}
@@ -698,7 +706,7 @@ export default function ArchiveDocumentTable({
                                                     <div className="fixed inset-0 z-10" onClick={() => setOpenDropdownId(null)}></div>
                                                     <div className="absolute right-0 mt-1 w-40 bg-white rounded-xl shadow-[0_5px_15px_-3px_rgba(0,0,0,0.1)] border border-gray-100 z-20 py-2 animate-in fade-in zoom-in-95 duration-100">
                                                         <ActionButton
-                                                            onClick={() => { window.open(`${API_SERVER}${doc.document}`); setOpenDropdownId(null); }}
+                                                            onClick={() => handleViewDocument(doc)}
                                                             className="w-full text-left px-4 py-2 text-[13px] font-semibold text-gray-700 hover:bg-gray-50 hover:text-[#B88E2F] flex items-center transition-colors"
                                                         >
                                                             <Eye size={15} className="mr-2" /> View
@@ -771,7 +779,7 @@ export default function ArchiveDocumentTable({
                             style={{ top: dropdownPos.top, right: dropdownPos.right }}
                         >
                             <ActionButton
-                                onClick={() => { window.open(`${API_SERVER}${doc.document}`); setOpenDropdownId(null); setDropdownPos(null); }}
+                                onClick={() => handleViewDocument(doc)}
                                 className="w-full text-left px-4 py-2.5 text-[13px] font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors group/item"
                             >
                                 <div className="w-7 h-7 rounded-lg bg-[#FEF3C7] flex items-center justify-center group-hover/item:bg-blue-100 transition-colors">
@@ -994,7 +1002,7 @@ export default function ArchiveDocumentTable({
                             {/* Action footer */}
                             <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
                                 <ActionButton
-                                    onClick={() => window.open(`${API_SERVER}${detailDoc.document}`)}
+                                    onClick={() => handleViewDocument(detailDoc)}
                                     className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-gray-200 text-[13px] font-bold text-gray-700 hover:bg-gray-50 transition-colors"
                                 >
                                     <Eye size={15} /> View File

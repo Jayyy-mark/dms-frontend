@@ -21,6 +21,8 @@ import { helper } from "../../helpers/utils";
 import { useFormErrors } from "../../hooks/useFormErrors";
 import { parseApiError } from "../../helpers/parseApiError";
 import ActionButton from "../ui/button/ActionButton";
+import { useAuth } from "../../context/AuthContext";
+import { useCurrentStaff } from "../../hooks/useStaff";
 
 interface PhotoPreviewItem {
   file: File;
@@ -33,6 +35,11 @@ export default function AddLocationForm() {
   const dateRef = useRef<any>(null);
   const [showMap, setShowMap] = useState(false);
   const { errors, validate } = useFormErrors<AddLocation>();
+
+  //for user
+  const { user } = useAuth();
+
+  const { staff } = useCurrentStaff(user?.staff_id);
 
   const [form, setForm] = useState<AddLocation>({
     location_name: "",
@@ -47,6 +54,16 @@ export default function AddLocationForm() {
     location_type: "",
     department_id: "",
   });
+
+  useEffect(() => {
+    const deptId = staff?.department_id ?? staff?.department?.id;
+    if (deptId !== undefined && deptId !== null && String(deptId) !== "") {
+      setForm((prev) => ({
+        ...prev,
+        department_id: String(deptId),
+      }));
+    }
+  }, [staff]);
 
   const [photoPreviews, setPhotoPreviews] = useState<PhotoPreviewItem[]>([]);
 
@@ -477,10 +494,15 @@ export default function AddLocationForm() {
                 options={departmentOptions}
                 menuPortalTarget={typeof document !== "undefined" ? document.body : null}
                 menuPosition="fixed"
-                value={departmentOptions.find((o) => o.value === form.department_id) || null}
+                value={
+                  departmentOptions.find((o) => o.value === form.department_id) ||
+                  (staff?.department?.id && staff?.department?.department_name
+                    ? { value: String(staff.department.id), label: staff.department.department_name }
+                    : null)
+                }
                 onChange={(option) => handleChange("department_id", option?.value || "")}
-                isSearchable
-                isClearable
+                isDisabled
+                isClearable={false}
                 placeholder={t("Select department...")}
                 styles={{
                   control: (base, state) => ({
@@ -491,9 +513,10 @@ export default function AddLocationForm() {
                     boxShadow: state.isFocused ? "0 0 0 3px rgba(184, 142, 47, 0.15)" : "none",
                     padding: "2px",
                     fontSize: "0.875rem",
-                    backgroundColor: "#ffffff",
+                    backgroundColor: state.isDisabled ? "#f9fafb" : "#ffffff",
+                    cursor: state.isDisabled ? "not-allowed" : "default",
                     "&:hover": {
-                      borderColor: "#B88E2F",
+                      borderColor: state.isDisabled ? "#e5e7eb" : "#B88E2F",
                     },
                   }),
                   menuPortal: (base) => ({ ...base, zIndex: 9999 }),

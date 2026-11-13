@@ -61,15 +61,23 @@ def download_tile(z, x, y):
 def collect_tiles():
     tiles = set()
 
-    # 1. Myanmar national overview: zoom 4-8
-    for z in range(4, 9):
-        x_min, y_max = deg2num(9.5, 92.0, z)
-        x_max, y_min = deg2num(28.5, 101.5, z)
+    # 1. Wide regional overview buffer (zoom 4-7) so zooming out never clips edges
+    for z in range(4, 8):
+        x_min, y_max = deg2num(-2.0, 82.0, z)
+        x_max, y_min = deg2num(36.0, 112.0, z)
         for x in range(x_min, x_max + 1):
             for y in range(y_min, y_max + 1):
                 tiles.add((z, x, y))
 
-    # 2. Greater Yangon: zoom 9-13
+    # 2. Full Myanmar national coverage (zoom 8-9) matching LocationModal maxBounds
+    for z in range(8, 10):
+        x_min, y_max = deg2num(8.5, 91.0, z)
+        x_max, y_min = deg2num(29.0, 102.5, z)
+        for x in range(x_min, x_max + 1):
+            for y in range(y_min, y_max + 1):
+                tiles.add((z, x, y))
+
+    # 3. Greater Yangon: zoom 9-13
     for z in range(9, 14):
         x_min, y_max = deg2num(16.4, 95.8, z)
         x_max, y_min = deg2num(17.3, 96.6, z)
@@ -77,7 +85,7 @@ def collect_tiles():
             for y in range(y_min, y_max + 1):
                 tiles.add((z, x, y))
 
-    # 3. Major hubs: zoom 9-12
+    # 4. Major hubs: zoom 9-12
     hubs = [
         (21.80, 22.10, 95.95, 96.20),  # Mandalay
         (19.60, 19.90, 96.00, 96.25),  # Naypyidaw
@@ -93,6 +101,37 @@ def collect_tiles():
                 for y in range(y_min, y_max + 1):
                     tiles.add((z, x, y))
 
+    # 5. All MYANMAR_CITIES & key regional centers at zoom 10-12
+    cities = [
+        (16.8409, 96.1735),  # Yangon
+        (21.9588, 96.0891),  # Mandalay
+        (19.7633, 96.0785),  # Naypyidaw
+        (17.3221, 96.4664),  # Bago
+        (18.9413, 96.4344),  # Taungoo
+        (20.1544, 94.9455),  # Magway
+        (20.8986, 94.8219),  # Chauk
+        (20.4633, 94.8778),  # Yenangyaung
+        (20.7888, 97.0378),  # Taunggyi
+        (16.4905, 97.6283),  # Mawlamyine
+        (16.7792, 94.7324),  # Pathein
+        (22.1086, 95.1354),  # Monywa
+        (20.1528, 92.8683),  # Sittwe
+        (25.3833, 97.4000),  # Myitkyina
+        (14.0828, 98.1942),  # Dawei
+        (18.8242, 95.2147),  # Pyay
+        (19.4264, 93.5519),  # Kyaukphyu
+        (20.8778, 95.8582),  # Meiktila
+        (21.3349, 95.0844),  # Pakokku
+        (16.8759, 97.6335),  # Hpa-An
+    ]
+    for lat, lon in cities:
+        for z in range(10, 13):
+            x_min, y_max = deg2num(lat - 0.12, lon - 0.12, z)
+            x_max, y_min = deg2num(lat + 0.12, lon + 0.12, z)
+            for x in range(x_min, x_max + 1):
+                for y in range(y_min, y_max + 1):
+                    tiles.add((z, x, y))
+
     return sorted(list(tiles))
 
 def main():
@@ -103,7 +142,7 @@ def main():
     ok_count = 0
     fail_count = 0
 
-    with ThreadPoolExecutor(max_workers=8) as executor:
+    with ThreadPoolExecutor(max_workers=16) as executor:
         futures = {executor.submit(download_tile, z, x, y): (z, x, y) for z, x, y in tiles}
         for future in as_completed(futures):
             ok, msg = future.result()
@@ -113,7 +152,7 @@ def main():
                 fail_count += 1
                 print(f"  FAIL: {msg}")
             total = ok_count + fail_count
-            if total % 50 == 0 or total == len(tiles):
+            if total % 100 == 0 or total == len(tiles):
                 print(f"Progress: {total}/{len(tiles)} (OK: {ok_count}, Fail: {fail_count})")
 
     print(f"\nDone! Success: {ok_count}, Failed: {fail_count}")

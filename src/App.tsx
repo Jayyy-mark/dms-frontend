@@ -60,6 +60,7 @@ import Staffs from "./pages/Staffs/Staff";
 import AddStaffs from "./pages/Staffs/AddStaff";
 import EditDocuments from "./pages/Documents/EditDocument";
 import Recycles from "./pages/Recycles/Recycles";
+import RecycleLocations from "./pages/Recycles/RecycleLocations";
 import Chatbot from "./pages/Users/Chatbot";
 import DeepSearchDocuments from "./pages/Documents/DeepSearch";
 import Locations from "./pages/Locations/Location";
@@ -175,6 +176,7 @@ export default function App() {
 
             <Route path="/documents/archives/" element={<ProtectedRoute feature="archives" action="view"><Archives /></ProtectedRoute>} />
             <Route path="/documents/recycles/" element={<ProtectedRoute feature="recycle_bin" action="view"><Recycles /></ProtectedRoute>} />
+            <Route path="/locations/recycles/" element={<ProtectedRoute feature="recycle_bin" action="view"><RecycleLocations /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><UserProfiles /></ProtectedRoute>} />
             <Route path="/calendar" element={
               <ProtectedRoute feature="calendar" action="view">

@@ -23,6 +23,8 @@ export interface Location {
     department?: Department | Record<string, unknown> | null;
     department_name?: string;
     file_type?: string;
+    is_deleted?: boolean;
+    deleted_time?: string | null;
 }
 
 export interface AddLocation {

@@ -78,6 +78,7 @@ const PATH_PERMISSIONS: Record<string, { feature: string; action: PermissionActi
   "/documents/deepsearch/": { feature: "deepsearch", action: "view" },
   "/documents/archives/": { feature: "archives", action: "view" },
   "/documents/recycles/": { feature: "recycle_bin", action: "view" },
+  "/locations/recycles/": { feature: "recycle_bin", action: "view" },
   "/dtypes/": { feature: "dtypes", action: "view" },
   "/categories/": { feature: "categories", action: "view" },
 
@@ -199,7 +200,10 @@ const documentItems: NavItem[] = [
   {
     icon: <RecycleIcon />,
     name: "recycle_bin",
-    path: "/documents/recycles/",
+    subItems: [
+      { name: "Documents", path: "/documents/recycles/" },
+      { name: "Locations", path: "/locations/recycles/" },
+    ],
   },
   {
     icon: <Layers />,

@@ -33,6 +33,7 @@ import {
   X,
 } from "lucide-react";
 import { swrFetcher } from "../../helpers/swrFetcher";
+import { documentApi } from "../../api/documentApi";
 import { Document } from "../../interfaces/document";
 import { Category } from "../../interfaces/category";
 import { Department } from "../../interfaces/department";
@@ -551,6 +552,9 @@ export default function DashboardDocumentsTab() {
     if (!fullUrl) {
       toast.info(t("Invalid document URL."));
       return;
+    }
+    if (doc.id) {
+      void documentApi.logView(doc.id).catch(() => {});
     }
     window.open(fullUrl, "_blank", "noopener,noreferrer");
   };
@@ -1683,6 +1687,11 @@ export default function DashboardDocumentsTab() {
                       download
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={() => {
+                        if (inspectedDoc.id) {
+                          void documentApi.logDownload(inspectedDoc.id).catch(() => {});
+                        }
+                      }}
                       className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 py-3 px-4 text-sm font-bold text-gray-700 dark:text-gray-200 transition"
                       title={t("Download")}
                     >

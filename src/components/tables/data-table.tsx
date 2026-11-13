@@ -39,6 +39,7 @@ type DataTableProps<T extends { id: number }> = {
     headerActions?: React.ReactNode;
     renderDetailPanel?: (row: T, onClose: () => void) => React.ReactNode;
     onExportPDF?: (currentFilter?: string) => void | Promise<unknown>;
+    onBulkDelete?: (selectedRows: T[]) => Promise<void> | void;
     serverPagination?: DataTableServerPagination;
 };
 
@@ -50,6 +51,7 @@ export function DataTable<T extends { id: number }>({
     headerActions,
     renderDetailPanel,
     onExportPDF,
+    onBulkDelete,
     serverPagination,
 }: DataTableProps<T>) {
     const { t } = useTranslation();
@@ -57,6 +59,7 @@ export function DataTable<T extends { id: number }>({
     const [rowSelection, setRowSelection] = useState({});
     const [detailRow, setDetailRow] = useState<T | null>(null);
     const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+    const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
     const isServerPaginated = Boolean(serverPagination);
     const activeSearch = isServerPaginated ? (serverPagination?.searchValue ?? "") : globalFilter;
@@ -64,6 +67,7 @@ export function DataTable<T extends { id: number }>({
     const table = useReactTable({
         data,
         columns,
+        getRowId: (row) => String(row.id),
         state: { globalFilter, rowSelection },
         manualPagination: isServerPaginated,
         manualFiltering: isServerPaginated,
@@ -354,20 +358,33 @@ export function DataTable<T extends { id: number }>({
                             <p className="text-[13px] text-gray-500 font-medium mb-8">This action cannot be undone.</p>
                             <div className="flex gap-3 w-full">
                                 <button
+                                    disabled={isBulkDeleting}
                                     onClick={() => setBulkDeleteOpen(false)}
-                                    className="flex-1 py-2.5 rounded-xl border border-gray-200 text-[13px] font-bold text-gray-700 hover:bg-gray-50 transition-colors"
+                                    className="flex-1 py-2.5 rounded-xl border border-gray-200 text-[13px] font-bold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
                                 >
                                     Cancel
                                 </button>
                                 <button
-                                    onClick={() => {
-                                        console.log("Bulk Delete Placeholder - Implement parent callback here if needed.");
-                                        setBulkDeleteOpen(false);
-                                        setRowSelection({});
+                                    disabled={isBulkDeleting}
+                                    onClick={async () => {
+                                        const selectedRows = table.getSelectedRowModel().rows.map((r) => r.original);
+                                        if (onBulkDelete && selectedRows.length > 0) {
+                                            setIsBulkDeleting(true);
+                                            try {
+                                                await onBulkDelete(selectedRows);
+                                                setBulkDeleteOpen(false);
+                                                setRowSelection({});
+                                            } finally {
+                                                setIsBulkDeleting(false);
+                                            }
+                                        } else {
+                                            setBulkDeleteOpen(false);
+                                            setRowSelection({});
+                                        }
                                     }}
-                                    className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-[13px] font-bold transition-colors shadow-sm"
+                                    className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-[13px] font-bold transition-colors shadow-sm disabled:opacity-50"
                                 >
-                                    Delete
+                                    {isBulkDeleting ? "Deleting..." : "Delete"}
                                 </button>
                             </div>
                         </div>

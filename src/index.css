@@ -193,6 +193,86 @@
   body {
     @apply relative font-normal font-inter z-1 bg-gray-50;
   }
+
+  /* Clean, minimalist global scrollbar (WebKit / Chromium / Edge) */
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar,
+  *::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+
+  html::-webkit-scrollbar-track,
+  body::-webkit-scrollbar-track,
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  html::-webkit-scrollbar-thumb,
+  body::-webkit-scrollbar-thumb,
+  *::-webkit-scrollbar-thumb {
+    background-color: rgba(148, 163, 184, 0.55);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+    transition: background-color 0.2s ease;
+  }
+
+  html::-webkit-scrollbar-thumb:hover,
+  body::-webkit-scrollbar-thumb:hover,
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(100, 116, 139, 0.78);
+  }
+
+  html::-webkit-scrollbar-thumb:active,
+  body::-webkit-scrollbar-thumb:active,
+  *::-webkit-scrollbar-thumb:active {
+    background-color: rgba(71, 85, 105, 0.9);
+  }
+
+  html::-webkit-scrollbar-button,
+  body::-webkit-scrollbar-button,
+  *::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  html::-webkit-scrollbar-corner,
+  body::-webkit-scrollbar-corner,
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  .dark::-webkit-scrollbar-thumb,
+  .dark *::-webkit-scrollbar-thumb {
+    background-color: rgba(148, 163, 184, 0.26);
+  }
+
+  .dark::-webkit-scrollbar-thumb:hover,
+  .dark *::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(148, 163, 184, 0.45);
+  }
+
+  .dark::-webkit-scrollbar-thumb:active,
+  .dark *::-webkit-scrollbar-thumb:active {
+    background-color: rgba(148, 163, 184, 0.62);
+  }
+
+  /* Firefox fallback (kept isolated so Chromium preserves ::-webkit-scrollbar) */
+  @supports not selector(::-webkit-scrollbar) {
+    html,
+    body,
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(148, 163, 184, 0.55) transparent;
+    }
+
+    .dark,
+    .dark * {
+      scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+    }
+  }
 }
 
 @utility menu-item {
@@ -270,19 +350,41 @@
 }
 @utility custom-scrollbar {
   &::-webkit-scrollbar {
-    @apply size-1.5;
+    width: 8px;
+    height: 8px;
   }
 
   &::-webkit-scrollbar-track {
-    @apply rounded-full;
+    background: transparent;
   }
 
   &::-webkit-scrollbar-thumb {
-    @apply bg-gray-200 rounded-full dark:bg-gray-700;
+    background-color: rgba(148, 163, 184, 0.55);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+    transition: background-color 0.2s ease;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(100, 116, 139, 0.78);
+  }
+
+  &::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  &::-webkit-scrollbar-corner {
+    background: transparent;
   }
 }
 .dark .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: #344054;
+  background-color: rgba(148, 163, 184, 0.26);
+}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(148, 163, 184, 0.45);
 }
 
 @layer utilities {
@@ -791,35 +893,15 @@ span.flatpickr-weekday,
 /* ============================= */
 /* Professional custom scrollbar */
 /* ============================= */
+@supports not selector(::-webkit-scrollbar) {
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.55) transparent;
+  }
 
-.custom-scrollbar {
-  scrollbar-width: thin;               /* Firefox */
-  scrollbar-color: #cbd5e1 transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar {
-  height: 8px;
-  width: 8px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: #f1f5f9; /* slate-100 */
-  border-radius: 10px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #cbd5f5; /* indigo-200 */
-  border-radius: 10px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #a5b4fc; /* indigo-300 */
-}
-
-/* Firefox */
-.custom-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: #cbd5f5 #f1f5f9;
+  .dark .custom-scrollbar {
+    scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+  }
 }
 
 /* ── Overview Dashboard Animations ── */

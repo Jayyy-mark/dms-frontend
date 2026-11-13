@@ -10,6 +10,7 @@ import { toast } from "react-toastify";
 import { useNavigate } from "react-router";
 import { helper } from "../../helpers/utils";
 import { API_SERVER } from "../../helpers/api";
+import { locationApi } from "../../api/locationApi";
 import FilterModal from "../../components/locations/FilterModal";
 import LocationTable from "../../components/locations/LocationTable";
 
@@ -86,6 +87,7 @@ export default function Locations() {
 
   const handleDownload = (location: Location) => {
     if (!location.photo) return;
+    void locationApi.logDownload(location.id).catch(() => {});
     fetch(`${API_SERVER}${location.photo}`)
       .then((response) => response.blob())
       .then((blob) => {
@@ -121,7 +123,7 @@ export default function Locations() {
               {/* Top Bar */}
               <div className="flex flex-col sm:flex-row items-center justify-between mb-8 pb-4 border-b border-gray-100 gap-4">
                 <div className="flex items-center gap-2">
-                  <span className="text-[#1a4a98] font-bold">Public</span>
+                  <span className="text-[#1a4a98] font-bold">Photos</span>
                   <span className="bg-[#1a4a98] text-white text-xs font-bold px-2.5 py-0.5 rounded-md">
                     {rootStats.total.toLocaleString()}
                   </span>
@@ -213,7 +215,7 @@ export default function Locations() {
                     setFolderPage(1);
                   }}
                 >
-                  Public
+                  Photo
                 </span>
                 <span className="text-gray-400">/</span>
                 <span className="text-[#1a4a98] font-bold">{selectedFolder}</span>
@@ -289,7 +291,10 @@ export default function Locations() {
                     {/* Hover Buttons */}
                     <div className="absolute top-2 right-2 flex flex-col gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
-                        onClick={() => window.open(`${API_SERVER}${location.photo}`, "_blank")}
+                        onClick={() => {
+                          void locationApi.logView(location.id).catch(() => {});
+                          window.open(`${API_SERVER}${location.photo}`, "_blank");
+                        }}
                         className="p-1.5 bg-white rounded shadow-sm text-[#B88E2F] hover:bg-[#FEF3C7] transition-colors"
                         title="View"
                       >
