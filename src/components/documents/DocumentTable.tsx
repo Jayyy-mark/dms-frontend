@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
 import ConfirmModal from "../common/ConfirmModal";
 import ActionButton from "../ui/button/ActionButton";
+import { useAuth } from "../../context/AuthContext";
 import { helper } from "../../helpers/utils";
 import { API_SERVER } from "../../helpers/api";
 import FilterModal from "../locations/FilterModal";
@@ -63,6 +64,8 @@ export default function DocumentTable({
     mutate: propMutate,
 }: DocumentTableProps = {}) {
     const { t } = useTranslation();
+    const { hasPermission } = useAuth();
+    const canArchive = hasPermission("archives", "add");
     const navigate = useNavigate();
 
     const [deleteOpen, setDeleteOpen] = useState(false);
@@ -246,6 +249,10 @@ export default function DocumentTable({
     };
 
     const handleArchiveDocument = async (document: Document) => {
+        if (!canArchive) {
+            toast.error("You do not have permission to archive documents.");
+            return;
+        }
         try {
             const data = await documentApi.archive(document.id);
             toast.success(data?.message);
@@ -253,7 +260,12 @@ export default function DocumentTable({
             mutate?.();
             setOpenDropdownId(null);
         } catch (error: any) {
-            toast.error(error?.message);
+            toast.error(
+                error?.response?.data?.message ||
+                error?.response?.data?.error ||
+                error?.message ||
+                "Failed to archive document"
+            );
         }
     }
 
@@ -827,9 +839,10 @@ export default function DocumentTable({
                                                         >
                                                             <Pencil size={15} className="mr-2" /> Edit
                                                         </ActionButton>
-                                                        {status !== "temporary" && (
+                                                        {status !== "temporary" && canArchive && (
                                                             <ActionButton
                                                                 onClick={() => handleArchiveDocument(doc)}
+                                                                disabled={!canArchive}
                                                                 className="w-full text-left px-4 py-2 text-[13px] font-semibold text-gray-700 hover:bg-gray-50 hover:text-[#B88E2F] flex items-center transition-colors"
                                                             >
                                                                 <ArchiveIcon size={15} className="mr-2" /> Archive
@@ -922,9 +935,10 @@ export default function DocumentTable({
                                 </div>
                                 Edit
                             </ActionButton>
-                            {status !== "temporary" && (
+                            {status !== "temporary" && canArchive && (
                                 <ActionButton
                                     onClick={() => handleArchiveDocument(doc)}
+                                    disabled={!canArchive}
                                     className="w-full text-left px-4 py-2.5 text-[13px] font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors group/item"
                                 >
                                     <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center group-hover/item:bg-amber-100 transition-colors">

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import {
@@ -49,6 +49,16 @@ export default function LocationDetailDrawer({
   }
 
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+  const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    setActivePhotoIndex(0);
+    setImgError(false);
+  }, [location.id]);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [activePhotoIndex]);
 
   const getFullPhotoUrl = (path: string) => {
     if (path.startsWith("http")) return path;
@@ -123,11 +133,12 @@ export default function LocationDetailDrawer({
             </div>
 
             {/* Featured Photo Viewer */}
-            {activePhotoUrl ? (
+            {activePhotoUrl && !imgError ? (
               <div className="relative group rounded-xl overflow-hidden border border-gray-200 bg-gray-900 aspect-[4/3] flex items-center justify-center">
                 <img
                   src={activePhotoUrl}
                   alt={location.location_name}
+                  onError={() => setImgError(true)}
                   className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                 />
 

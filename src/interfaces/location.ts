@@ -66,10 +66,39 @@ export interface LocationOptions {
     coordinates: Coordinate[];
 }
 
+export interface LocationMapPoint {
+    id: number;
+    location_id: string;
+    location_name: string;
+    location_type: string;
+    city: string;
+    state_division: string;
+    latitude: number;
+    longitude: number;
+}
+
+export interface LocationMapStats {
+    total: number;
+    offshore: number;
+    onshore: number;
+    pipeline: number;
+    office: number;
+}
+
+export interface LocationMapSummaryResponse {
+    stats: LocationMapStats;
+    points: LocationMapPoint[];
+}
+
 export interface UpdateLocation {
     id: number;
     location_id: string;
     location_name: string;
+    photo?: string | File | null;
+    photos?: LocationPhotoItem[];
+    new_photos?: File[];
+    deleted_photo_ids?: number[];
+    remove_legacy_photo?: boolean;
     latitude: string;
     longitude: string;
     date: Date | string | null;

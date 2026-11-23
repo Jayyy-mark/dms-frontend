@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ComponentCard from "../../common/ComponentCard.tsx";
 import Label from "../../form/Label.tsx";
 import Input from "../../form/input/InputField.tsx";
@@ -13,6 +13,12 @@ import { useFormErrors } from "../../../hooks/useFormErrors.ts";
 import { parseApiError } from "../../../helpers/parseApiError.ts";
 import { Eye, EyeOff } from "lucide-react";
 import ActionButton from "../../ui/button/ActionButton.tsx";
+import {
+  getStoredUserRoles,
+  USER_ROLES_CHANGE_EVENT,
+  UserRoleItem,
+} from "../../../utils/userRoleManager.ts";
+import { userRoleApi } from "../../../api/userRoleApi.ts";
 
 
 const emptyUser: User = {
@@ -25,12 +31,36 @@ const emptyUser: User = {
 
 export default function EditUserInputs() {
   const { t } = useTranslation();
-  const roleOptions = [
-    { value: "admin", label: "admin" },
-    { value: "staff", label: "staff" },
-    { value: "user", label: "user" },
-    { value: "super admin", label: "super admin" },
-  ];
+  const [userRoles, setUserRoles] = useState<UserRoleItem[]>(getStoredUserRoles);
+
+  useEffect(() => {
+    const fetchRoles = () => {
+      userRoleApi
+        .getRoles()
+        .then((data: any) => {
+          const roles = data?.roles || data?.user_roles || data;
+          if (Array.isArray(roles) && roles.length > 0) {
+            setUserRoles(roles);
+          }
+        })
+        .catch(() => {
+          setUserRoles(getStoredUserRoles());
+        });
+    };
+
+    fetchRoles();
+    window.addEventListener(USER_ROLES_CHANGE_EVENT, fetchRoles);
+    return () => {
+      window.removeEventListener(USER_ROLES_CHANGE_EVENT, fetchRoles);
+    };
+  }, []);
+
+  const roleOptions = useMemo(() => {
+    return userRoles.map((r: UserRoleItem) => ({
+      value: r.name.toLowerCase(),
+      label: r.name,
+    }));
+  }, [userRoles]);
 
   const statusOptions = [
     { value: "active", label: "Active (Allowed to log in)" },
@@ -74,7 +104,6 @@ export default function EditUserInputs() {
     
     const valid = validate([
       { field: "username", value: user.username, label: "Username", required: true },
-      { field: "email", value: user.email, label: "Email", required: true },
       { field: "role", value: user.role, label: "Role", required: true },
     ]);
     if (!valid) return;
@@ -136,7 +165,7 @@ export default function EditUserInputs() {
           <Select
             options={roleOptions}
             placeholder="Select role"
-            value={user.role}
+            value={user.role ? user.role.toLowerCase() : ""}
             onChange={handleSelectChange}
             className="dark:bg-dark-900"
           />
@@ -156,13 +185,15 @@ export default function EditUserInputs() {
         </div>
 
         <div>
-          <Label>Email</Label>
+          <Label>
+            Email
+            <span className="ml-1 text-gray-400 text-xs">(optional)</span>
+          </Label>
           <Input
             type="text"
-            value={user.email}
-            onChange={(e) =>
-              setUser({ ...user, email: e.target.value })
-            }
+            value={user.email || ""}
+            disabled
+            placeholder="No email linked"
           />
           <FieldError message={errors.email} />
         </div>

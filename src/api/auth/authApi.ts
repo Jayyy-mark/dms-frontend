@@ -8,9 +8,10 @@ import { SignupFormData } from "../../interfaces/auth/SignUpFormData";
 
 export const authApi = {
     async login(form : SignInFormData):Promise<any>{
-        
+        const identifier = form.email.trim();
         const res = await api.post("auth/login/",{
-            email: form.email,
+            email: identifier,
+            username: identifier,
             password: form.password
         });
 

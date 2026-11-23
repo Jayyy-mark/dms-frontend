@@ -2,7 +2,7 @@ export interface UserApi{
     id:number;
     user_id:string;
     username:string;
-    email:string;
+    email?:string | null;
     role:string;
 }
 
@@ -12,7 +12,7 @@ export interface User{
     id:number;
     user_id:string;
     username:string;
-    email:string;
+    email?:string | null;
     role:string;
     is_active?:boolean;
     is_staff?:boolean;
@@ -21,7 +21,7 @@ export interface User{
 
 export interface AddUserForm{
     username:string;
-    email:string;
+    email?:string;
     staff_id:string;
     password1:string;
     password2:string;
@@ -31,7 +31,7 @@ export interface AddUserForm{
 export interface EditUserForm{
     user_id:string;
     username:string;
-    email:string;
+    email?:string | null;
     role:string;
 }
 

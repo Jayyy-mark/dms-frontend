@@ -46,13 +46,6 @@ export const FEATURE_DISPLAY_INFO: Record<
   staff_types: { displayName: "Staff Types" },
   roles: { displayName: "Roles" },
   ranks: { displayName: "Ranks" },
-  promotions: { displayName: "Promotions" },
-  transfers: { displayName: "Transfers" },
-  training: { displayName: "Training" },
-  overseas: { displayName: "Overseas Travel" },
-  awards: { displayName: "Awards" },
-  punishments: { displayName: "Punishments" },
-  reports: { displayName: "HR Reports", hasAdd: false, hasEdit: false, hasDelete: false },
   documents: { displayName: "Main Documents Repository" },
   archives: { displayName: "Archived Documents", hasEdit: false },
   recycle_bin: { displayName: "Recycle Bin & Recovery", hasAdd: false },
@@ -65,7 +58,6 @@ export const FEATURE_DISPLAY_INFO: Record<
   users: { displayName: "User Accounts" },
   chatbot: { displayName: "AI Assistant Chatbot", hasEdit: false, hasDelete: false },
   locations: { displayName: "Activity Records" },
-  calendar: { displayName: "Event Calendar" },
   logs: { displayName: "User Audit Logs", hasAdd: false, hasEdit: false, hasDelete: false },
 };
 

@@ -35,7 +35,7 @@ export default function AddUserFormComponent() {
       userRoleApi
         .getRoles()
         .then((data: any) => {
-          const roles = data.user_roles || data;
+          const roles = data?.roles || data?.user_roles || data;
           if (Array.isArray(roles) && roles.length > 0) {
             setUserRoles(roles);
           }
@@ -80,7 +80,6 @@ export default function AddUserFormComponent() {
 
     const valid = validate([
       { field: "username", value: form.username, label: "Username", required: true },
-      { field: "email", value: form.email, label: "Email", required: true },
       { field: "role", value: form.role, label: "Role", required: true },
       { field: "password1", value: form.password1, label: "Password", required: true },
       { field: "password2", value: form.password2, label: "Re-type Password", required: true },
@@ -132,14 +131,17 @@ export default function AddUserFormComponent() {
           <FieldError message={errors.username} />
         </div>
 
-        {/* Email */}
+        {/* Email (disabled & optional; only filled when a staff member is selected) */}
         <div>
-          <Label>Email</Label>
+          <Label>
+            Email
+            <span className="ml-1 text-gray-400 text-xs">(optional • auto-filled from staff)</span>
+          </Label>
           <Input
             type="text"
             value={form.email}
-            onChange={(e) => { setForm({ ...form, email: e.target.value }); clearFieldError("email"); }}
-            placeholder="Enter email"
+            disabled
+            placeholder="Auto-filled when a staff member is selected"
           />
           <FieldError message={errors.email} />
         </div>
@@ -152,14 +154,19 @@ export default function AddUserFormComponent() {
             value={roleOptions.find((o: { value: string; label: string }) => o.value === form.role) ?? null}
             onChange={(option: any) => {
               const nextRole = (option?.value ?? "").trim().toLowerCase();
-              setForm((prev) => ({
-                ...prev,
-                role: option?.value ?? "",
-                // Clear staff when switching roles so validation re-evaluates
-                staff_id: PRIVILEGED_ROLES.has(nextRole) ? prev.staff_id : "",
-              }));
+              setForm((prev) => {
+                const keepStaff = PRIVILEGED_ROLES.has(nextRole) ? prev.staff_id : "";
+                return {
+                  ...prev,
+                  role: option?.value ?? "",
+                  // Clear staff & email when switching roles so validation re-evaluates
+                  staff_id: keepStaff,
+                  email: keepStaff ? prev.email : "",
+                };
+              });
               clearFieldError("role");
               clearFieldError("staff_id");
+              clearFieldError("email");
             }}
             isSearchable
             isClearable
@@ -188,9 +195,10 @@ export default function AddUserFormComponent() {
               setForm((prev) => ({
                 ...prev,
                 staff_id: option?.value ?? "",
-                email: option?.data?.staff_email ?? prev.email,
+                email: option ? (option?.data?.staff_email ?? "") : "",
               }));
               clearFieldError("staff_id");
+              clearFieldError("email");
             }}
             isSearchable
             isClearable

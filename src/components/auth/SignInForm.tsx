@@ -35,7 +35,7 @@ export default function SignInForm() {
     if (submittingRef.current || isSubmitting) return;
 
     if (!form.email.trim() || !form.password.trim()) {
-      await toast.warning("Please enter both email and password.");
+      await toast.warning("Please enter both username/email and password.");
       return;
     }
 
@@ -112,7 +112,7 @@ export default function SignInForm() {
               Sign In
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Enter your email and password to sign in!
+              Enter your username or email and password to sign in!
             </p>
           </div>
           <div>
@@ -125,10 +125,10 @@ export default function SignInForm() {
               <div className="space-y-6">
                 <div>
                   <Label>
-                    Email <span className="text-error-500">*</span>{" "}
+                    Username or Email <span className="text-error-500">*</span>{" "}
                   </Label>
                   <Input
-                    placeholder="info@gmail.com"
+                    placeholder="Enter username or email"
                     id="email"
                     name="email"
                     value={form.email}

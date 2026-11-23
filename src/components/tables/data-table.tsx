@@ -8,8 +8,8 @@ import {
     getFilteredRowModel,
     flexRender,
 } from "@tanstack/react-table";
-import { useState } from "react";
-import { Search, Trash2, FileText, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Search, Trash2, FileText, X, RotateCcw } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { ColumnDef } from "@tanstack/react-table";
@@ -39,7 +39,9 @@ type DataTableProps<T extends { id: number }> = {
     headerActions?: React.ReactNode;
     renderDetailPanel?: (row: T, onClose: () => void) => React.ReactNode;
     onExportPDF?: (currentFilter?: string) => void | Promise<unknown>;
+    hideExportPDF?: boolean;
     onBulkDelete?: (selectedRows: T[]) => Promise<void> | void;
+    onBulkRestore?: (selectedRows: T[]) => Promise<void> | void;
     serverPagination?: DataTableServerPagination;
 };
 
@@ -51,7 +53,9 @@ export function DataTable<T extends { id: number }>({
     headerActions,
     renderDetailPanel,
     onExportPDF,
+    hideExportPDF = false,
     onBulkDelete,
+    onBulkRestore,
     serverPagination,
 }: DataTableProps<T>) {
     const { t } = useTranslation();
@@ -60,9 +64,14 @@ export function DataTable<T extends { id: number }>({
     const [detailRow, setDetailRow] = useState<T | null>(null);
     const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
     const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+    const [isBulkRestoring, setIsBulkRestoring] = useState(false);
 
     const isServerPaginated = Boolean(serverPagination);
     const activeSearch = isServerPaginated ? (serverPagination?.searchValue ?? "") : globalFilter;
+
+    useEffect(() => {
+        setRowSelection({});
+    }, [serverPagination?.currentPage, serverPagination?.itemsPerPage, activeSearch]);
 
     const table = useReactTable({
         data,
@@ -175,11 +184,32 @@ export function DataTable<T extends { id: number }>({
                     <div className="flex items-center gap-2 shrink-0">
                         {headerActions}
 
-                        {table.getSelectedRowModel().rows.length > 0 && (
+                        {table.getSelectedRowModel().rows.length > 0 && onBulkRestore && (
                             <button
-                                onClick={() => {
-                                    console.log("Bulk delete");
+                                type="button"
+                                disabled={isBulkRestoring}
+                                onClick={async () => {
+                                    const selectedRows = table.getSelectedRowModel().rows.map((r) => r.original);
+                                    if (selectedRows.length === 0) return;
+                                    setIsBulkRestoring(true);
+                                    try {
+                                        await onBulkRestore(selectedRows);
+                                        setRowSelection({});
+                                    } finally {
+                                        setIsBulkRestoring(false);
+                                    }
                                 }}
+                                className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[12px] font-bold text-emerald-700 transition hover:bg-emerald-100 shadow-sm disabled:opacity-50"
+                            >
+                                <RotateCcw size={13} />
+                                {isBulkRestoring ? t("Restoring...") : t("Restore Selected")}
+                            </button>
+                        )}
+
+                        {table.getSelectedRowModel().rows.length > 0 && onBulkDelete && (
+                            <button
+                                type="button"
+                                onClick={() => setBulkDeleteOpen(true)}
                                 className="flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-[12px] font-bold text-red-600 transition hover:bg-red-100 shadow-sm"
                             >
                                 <Trash2 size={13} />
@@ -188,11 +218,13 @@ export function DataTable<T extends { id: number }>({
                         )}
 
                         {/* Export Buttons */}
-                        <div className="flex items-center bg-gray-50 rounded-lg p-1 border border-gray-200 gap-1">
-                            <ActionButton onClick={handleExportPDF} className="p-1 rounded transition-colors text-gray-400 hover:text-red-500 hover:bg-white shadow-sm" title="Export PDF">
-                                <FileText size={15} />
-                            </ActionButton>
-                        </div>
+                        {!hideExportPDF && (
+                            <div className="flex items-center bg-gray-50 rounded-lg p-1 border border-gray-200 gap-1">
+                                <ActionButton onClick={handleExportPDF} className="p-1 rounded transition-colors text-gray-400 hover:text-red-500 hover:bg-white shadow-sm" title="Export PDF">
+                                    <FileText size={15} />
+                                </ActionButton>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -214,16 +246,17 @@ export function DataTable<T extends { id: number }>({
                                         const renderedHeader = typeof headerContent === "string"
                                             ? t(headerContent)
                                             : flexRender(headerContent, header.getContext());
+                                        const canSort = header.column.getCanSort();
                                         return (
                                             <th
                                                 key={header.id}
-                                                onClick={header.column.getToggleSortingHandler()}
-                                                className="px-6 py-4 text-[11px] font-extrabold text-gray-400 uppercase tracking-widest cursor-pointer hover:bg-gray-100/50 transition-colors whitespace-nowrap"
+                                                onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
+                                                className={`px-6 py-4 text-[11px] font-extrabold text-gray-400 uppercase tracking-widest transition-colors whitespace-nowrap ${canSort ? "cursor-pointer hover:bg-gray-100/50" : ""}`}
                                             >
                                                 <div className="flex items-center gap-1">
                                                     {renderedHeader}
-                                                    {header.column.getIsSorted() === "asc" && " ↑"}
-                                                    {header.column.getIsSorted() === "desc" && " ↓"}
+                                                    {canSort && header.column.getIsSorted() === "asc" && " ↑"}
+                                                    {canSort && header.column.getIsSorted() === "desc" && " ↓"}
                                                 </div>
                                             </th>
                                         );
@@ -264,16 +297,23 @@ export function DataTable<T extends { id: number }>({
                                         onClick={() => setDetailRow(row.original)}
                                         className={`hover:bg-[#FEF3C7]/30 transition-colors group cursor-pointer ${row.getIsSelected() ? 'bg-[#FEF3C7]/50' : ''}`}
                                     >
-                                        {row.getVisibleCells().map((cell) => (
-                                            <td
-                                                key={cell.id}
-                                                title={String(cell.getValue() ?? "")}
-                                                className="px-6 py-4 text-[13px] font-semibold text-[#0f172a] whitespace-nowrap"
-                                                onClick={cell.column.id === 'select' || cell.column.id === 'actions' ? (e) => e.stopPropagation() : undefined}
-                                            >
-                                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                            </td>
-                                        ))}
+                                        {row.getVisibleCells().map((cell) => {
+                                            const rawVal = cell.getValue();
+                                            const cellTitle =
+                                                typeof rawVal === "string" || typeof rawVal === "number"
+                                                    ? String(rawVal)
+                                                    : undefined;
+                                            return (
+                                                <td
+                                                    key={cell.id}
+                                                    title={cellTitle}
+                                                    className="px-6 py-4 text-[13px] font-semibold text-[#0f172a] whitespace-nowrap"
+                                                    onClick={cell.column.id === 'select' || cell.column.id === 'actions' ? (e) => e.stopPropagation() : undefined}
+                                                >
+                                                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                                </td>
+                                            );
+                                        })}
                                     </tr>
                                 ))
                             ) : (
@@ -323,25 +363,50 @@ export function DataTable<T extends { id: number }>({
             </div>
 
             {/* ── Floating bulk-action bar ── */}
-            {table.getSelectedRowModel().rows.length > 0 && (
+            {table.getSelectedRowModel().rows.length > 0 && (onBulkDelete || onBulkRestore) && (
                 <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-white border border-gray-200 shadow-[0_8px_30px_-4px_rgba(0,0,0,0.15)] rounded-2xl px-6 py-3 animate-in slide-in-from-bottom-4 duration-200">
                     <span className="text-[14px] font-bold text-gray-800">
-                        {table.getSelectedRowModel().rows.length} selected
+                        {table.getSelectedRowModel().rows.length} {t("selected")}
                     </span>
                     <div className="h-5 w-px bg-gray-200"></div>
                     <button
+                        type="button"
                         onClick={() => setRowSelection({})}
                         className="text-[13px] font-semibold text-gray-500 hover:text-gray-800 transition-colors"
                     >
-                        Clear
+                        {t("Clear")}
                     </button>
-                    <button
-                        onClick={() => setBulkDeleteOpen(true)}
-                        className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white text-[13px] font-bold px-4 py-2 rounded-xl transition-colors shadow-sm"
-                    >
-                        <Trash2 size={14} />
-                        Delete
-                    </button>
+                    {onBulkRestore && (
+                        <button
+                            type="button"
+                            disabled={isBulkRestoring}
+                            onClick={async () => {
+                                const selectedRows = table.getSelectedRowModel().rows.map((r) => r.original);
+                                if (selectedRows.length === 0) return;
+                                setIsBulkRestoring(true);
+                                try {
+                                    await onBulkRestore(selectedRows);
+                                    setRowSelection({});
+                                } finally {
+                                    setIsBulkRestoring(false);
+                                }
+                            }}
+                            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[13px] font-bold px-4 py-2 rounded-xl transition-colors shadow-sm disabled:opacity-50"
+                        >
+                            <RotateCcw size={14} />
+                            {isBulkRestoring ? t("Restoring...") : t("Restore")}
+                        </button>
+                    )}
+                    {onBulkDelete && (
+                        <button
+                            type="button"
+                            onClick={() => setBulkDeleteOpen(true)}
+                            className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white text-[13px] font-bold px-4 py-2 rounded-xl transition-colors shadow-sm"
+                        >
+                            <Trash2 size={14} />
+                            {t("Delete")}
+                        </button>
+                    )}
                 </div>
             )}
 

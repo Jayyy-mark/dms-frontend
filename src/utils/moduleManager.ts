@@ -34,7 +34,6 @@ export const DEFAULT_MODULES: AppModule[] = [
 
   // System Category
   { id: "locations", name: "Activity Records", myanmarName: "လှုပ်ရှားမှု မှတ်တမ်းများ", category: "System", description: "Geographic photo activity records", enabled: true, paths: ["/locations/"] },
-  { id: "calendar", name: "Calendar", myanmarName: "ပြက္ခဒိန်", category: "System", description: "Event and task calendar", enabled: true, paths: ["/calendar"] },
   { id: "logs", name: "Audit Logs", myanmarName: "စနစ်မှတ်တမ်းများ", category: "System", description: "System security and activity logs", enabled: true, paths: ["/logs/"] },
 ];
 

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router";
 import useSWR from "swr";
 import Select from "react-select";
 import {
+  Archive,
   BarChart3,
   Building2,
   Calendar,
@@ -27,6 +28,7 @@ import {
   RotateCcw,
   Search,
   Sparkles,
+  Trash2,
   Type,
   User,
   Users,
@@ -44,11 +46,12 @@ import { toast } from "react-toastify";
 /* ── Types ── */
 type TimeHorizon = "all" | "daily" | "weekly" | "monthly";
 type RecordFilter = "all" | "permanent" | "temporary";
+type DocumentStatusFilter = "all" | "normal" | "archive" | "recycle";
 type SelectOption = { value: string; label: string };
 
 const DEFAULT_FONT_SCALE = 85;
 const FONT_SCALE_STORAGE_KEY = "moge_doc_dashboard_font_scale_v2";
-const CACHE_STORAGE_KEY = "moge_doc_dashboard_cache_v1";
+const CACHE_STORAGE_KEY = "moge_doc_dashboard_cache_v2";
 
 interface CachedDashboardData {
   docs: Document[];
@@ -102,8 +105,8 @@ const FONT_PRESETS = [
   },
 ];
 
-/* ── Clean Date Helpers ── */
-function fmtDate(d?: string) {
+/* ── Clean Date & Status Helpers ── */
+function fmtDate(d?: string | null) {
   if (!d) return "—";
   const parsed = new Date(d);
   if (isNaN(parsed.getTime())) return d;
@@ -112,6 +115,50 @@ function fmtDate(d?: string) {
     month: "short",
     year: "numeric",
   });
+}
+
+function getDocumentStatus(doc: Document): "normal" | "archive" | "recycle" {
+  if (doc.is_recycled) return "recycle";
+  if (doc.is_archived) return "archive";
+  return "normal";
+}
+
+function parseLocalDateBoundary(dateStr: string, endOfDay: boolean): number | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr.trim());
+  if (!match) return null;
+  const [, y, m, d] = match;
+  return new Date(
+    Number(y),
+    Number(m) - 1,
+    Number(d),
+    endOfDay ? 23 : 0,
+    endOfDay ? 59 : 0,
+    endOfDay ? 59 : 0,
+    endOfDay ? 999 : 0
+  ).getTime();
+}
+
+function isWithinDateRange(
+  dateStr?: string | null,
+  fromStr?: string,
+  toStr?: string
+): boolean {
+  const hasFrom = Boolean(fromStr && fromStr.trim());
+  const hasTo = Boolean(toStr && toStr.trim());
+  if (!hasFrom && !hasTo) return true;
+  if (!dateStr) return false;
+  const docTime = new Date(dateStr).getTime();
+  if (isNaN(docTime)) return false;
+
+  if (hasFrom) {
+    const fromTime = parseLocalDateBoundary(fromStr!, false);
+    if (fromTime !== null && docTime < fromTime) return false;
+  }
+  if (hasTo) {
+    const toTime = parseLocalDateBoundary(toStr!, true);
+    if (toTime !== null && docTime > toTime) return false;
+  }
+  return true;
 }
 
 function isWithinHorizon(dateStr: string | undefined, horizon: TimeHorizon): boolean {
@@ -217,7 +264,7 @@ export default function DashboardDocumentsTab() {
     isLoading: docLoading,
     isValidating: docValidating,
     mutate: mutateDocs,
-  } = useSWR<any>("document/all/", swrFetcher, swrOptions);
+  } = useSWR<any>("document/all/?include_all=true", swrFetcher, swrOptions);
 
   const {
     data: staffRes,
@@ -298,10 +345,32 @@ export default function DashboardDocumentsTab() {
   /* Simple, Clear Filters */
   const [timeHorizon, setTimeHorizon] = useState<TimeHorizon>("all");
   const [recordFilter, setRecordFilter] = useState<RecordFilter>("all");
+  const [documentStatus, setDocumentStatus] = useState<DocumentStatusFilter>("all");
+  const [uploadedFrom, setUploadedFrom] = useState("");
+  const [uploadedTo, setUploadedTo] = useState("");
+  const [archivedFrom, setArchivedFrom] = useState("");
+  const [archivedTo, setArchivedTo] = useState("");
+  const [recycledFrom, setRecycledFrom] = useState("");
+  const [recycledTo, setRecycledTo] = useState("");
   const [selectedDeptId, setSelectedDeptId] = useState<string>("");
   const [selectedStaffId, setSelectedStaffId] = useState<string>("");
   const [selectedCatId, setSelectedCatId] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
+
+  const isArchiveDateEnabled = documentStatus === "archive";
+  const isRecycleDateEnabled = documentStatus === "recycle";
+
+  const handleDocumentStatusChange = (nextStatus: DocumentStatusFilter) => {
+    setDocumentStatus(nextStatus);
+    if (nextStatus !== "archive") {
+      setArchivedFrom("");
+      setArchivedTo("");
+    }
+    if (nextStatus !== "recycle") {
+      setRecycledFrom("");
+      setRecycledTo("");
+    }
+  };
 
   /* Pagination */
   const [currentPage, setCurrentPage] = useState(1);
@@ -374,7 +443,21 @@ export default function DashboardDocumentsTab() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [timeHorizon, recordFilter, selectedDeptId, selectedStaffId, selectedCatId, searchQuery]);
+  }, [
+    timeHorizon,
+    recordFilter,
+    documentStatus,
+    uploadedFrom,
+    uploadedTo,
+    archivedFrom,
+    archivedTo,
+    recycledFrom,
+    recycledTo,
+    selectedDeptId,
+    selectedStaffId,
+    selectedCatId,
+    searchQuery,
+  ]);
 
   /* 1. Time-filtered documents */
   const horizonDocs = useMemo(
@@ -456,8 +539,8 @@ export default function DashboardDocumentsTab() {
       .sort((a, b) => b.count - a.count);
   }, [horizonDocs, staffList, selectedDeptId]);
 
-  /* 4. Final Filtered Documents for the Table */
-  const filteredDocs = useMemo(() => {
+  /* 4a. Base filtered documents (before Document Status & Date Range filters) for status counts */
+  const baseTableDocs = useMemo(() => {
     const cleanQ = searchQuery.trim().toLowerCase().normalize("NFKC");
 
     return horizonDocs.filter((doc) => {
@@ -503,14 +586,70 @@ export default function DashboardDocumentsTab() {
     searchQuery,
   ]);
 
+  /* Counts per Document Status for the status pills */
+  const statusCounts = useMemo(() => {
+    let normal = 0;
+    let archive = 0;
+    let recycle = 0;
+    baseTableDocs.forEach((doc) => {
+      const st = getDocumentStatus(doc);
+      if (st === "recycle") recycle++;
+      else if (st === "archive") archive++;
+      else normal++;
+    });
+    return { all: baseTableDocs.length, normal, archive, recycle };
+  }, [baseTableDocs]);
+
+  /* 4b. Final Filtered Documents for the Table (Status + Conditional Date Ranges) */
+  const filteredDocs = useMemo(() => {
+    return baseTableDocs.filter((doc) => {
+      const st = getDocumentStatus(doc);
+      if (documentStatus !== "all" && st !== documentStatus) {
+        return false;
+      }
+      // Uploaded Time range (always active when set)
+      if (!isWithinDateRange(doc.created_at, uploadedFrom, uploadedTo)) {
+        return false;
+      }
+      // Archived Time range (enabled only when Archive status is selected)
+      if (isArchiveDateEnabled && !isWithinDateRange(doc.archived_at, archivedFrom, archivedTo)) {
+        return false;
+      }
+      // Recycled Time range (enabled only when Recycle status is selected)
+      if (isRecycleDateEnabled && !isWithinDateRange(doc.recycled_at, recycledFrom, recycledTo)) {
+        return false;
+      }
+      return true;
+    });
+  }, [
+    baseTableDocs,
+    documentStatus,
+    uploadedFrom,
+    uploadedTo,
+    isArchiveDateEnabled,
+    archivedFrom,
+    archivedTo,
+    isRecycleDateEnabled,
+    recycledFrom,
+    recycledTo,
+  ]);
+
   const catOptions = useMemo<SelectOption[]>(
     () => catList.map((c) => ({ value: String(c.id), label: c.category_name })),
     [catList]
   );
 
+  const hasDateRangeFilter =
+    Boolean(uploadedFrom) ||
+    Boolean(uploadedTo) ||
+    (isArchiveDateEnabled && (Boolean(archivedFrom) || Boolean(archivedTo))) ||
+    (isRecycleDateEnabled && (Boolean(recycledFrom) || Boolean(recycledTo)));
+
   const hasActiveFilters =
     timeHorizon !== "all" ||
     recordFilter !== "all" ||
+    documentStatus !== "all" ||
+    hasDateRangeFilter ||
     Boolean(selectedDeptId) ||
     Boolean(selectedStaffId) ||
     Boolean(selectedCatId) ||
@@ -519,6 +658,13 @@ export default function DashboardDocumentsTab() {
   const resetFilters = () => {
     setTimeHorizon("all");
     setRecordFilter("all");
+    setDocumentStatus("all");
+    setUploadedFrom("");
+    setUploadedTo("");
+    setArchivedFrom("");
+    setArchivedTo("");
+    setRecycledFrom("");
+    setRecycledTo("");
     setSelectedDeptId("");
     setSelectedStaffId("");
     setSelectedCatId("");
@@ -1085,12 +1231,254 @@ export default function DashboardDocumentsTab() {
             </div>
           </div>
 
-          {/* Active Selection Banner (if Department or Staff is selected) */}
-          {(selectedDeptObj || selectedStaffObj || timeHorizon !== "all") && (
+          {/* Row 2: Document Status Filter Pills (All, Normal, Archive, Recycle) */}
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <span className="text-xs font-extrabold uppercase tracking-wider text-gray-400 mr-1">
+              {t("Status")}:
+            </span>
+            {(
+              [
+                {
+                  id: "all",
+                  label: t("All"),
+                  count: statusCounts.all,
+                  icon: <FileText size={14} />,
+                  activeCls: "bg-[#B88E2F] border-[#B88E2F] text-white shadow-xs",
+                  idleCls:
+                    "bg-gray-50 border-gray-200 text-gray-700 hover:border-amber-300 hover:bg-amber-50/50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200",
+                },
+                {
+                  id: "normal",
+                  label: t("Normal"),
+                  count: statusCounts.normal,
+                  icon: <CheckCircle2 size={14} />,
+                  activeCls: "bg-emerald-600 border-emerald-600 text-white shadow-xs",
+                  idleCls:
+                    "bg-emerald-50/60 border-emerald-200/80 text-emerald-700 hover:bg-emerald-100/70 dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:text-emerald-300",
+                },
+                {
+                  id: "archive",
+                  label: t("Archive"),
+                  count: statusCounts.archive,
+                  icon: <Archive size={14} />,
+                  activeCls: "bg-amber-600 border-amber-600 text-white shadow-xs",
+                  idleCls:
+                    "bg-amber-50/70 border-amber-200/80 text-amber-800 hover:bg-amber-100/70 dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-300",
+                },
+                {
+                  id: "recycle",
+                  label: t("Recycle"),
+                  count: statusCounts.recycle,
+                  icon: <Trash2 size={14} />,
+                  activeCls: "bg-rose-600 border-rose-600 text-white shadow-xs",
+                  idleCls:
+                    "bg-rose-50/70 border-rose-200/80 text-rose-700 hover:bg-rose-100/70 dark:bg-rose-500/10 dark:border-rose-500/30 dark:text-rose-300",
+                },
+              ] as {
+                id: DocumentStatusFilter;
+                label: string;
+                count: number;
+                icon: React.ReactNode;
+                activeCls: string;
+                idleCls: string;
+              }[]
+            ).map((item) => {
+              const active = documentStatus === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => handleDocumentStatusChange(item.id)}
+                  className={`inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-bold transition cursor-pointer ${
+                    active ? item.activeCls : item.idleCls
+                  }`}
+                >
+                  {item.icon}
+                  <span>{item.label}</span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[11px] font-extrabold ${
+                      active
+                        ? "bg-white/25 text-white"
+                        : "bg-white/90 dark:bg-gray-900/60 text-gray-800 dark:text-gray-200"
+                    }`}
+                  >
+                    {item.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Row 3: Date Range Filters (Uploaded Time, Archived Time, Recycled Time) */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            {/* Uploaded Time Range (always enabled) */}
+            <div className="rounded-xl border border-gray-200/80 dark:border-gray-700 bg-gray-50/70 dark:bg-gray-800/50 p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1.5 text-xs font-extrabold text-gray-700 dark:text-gray-200">
+                  <Calendar size={13} className="text-teal-600" />
+                  {t("Uploaded Time")}
+                </span>
+                {(uploadedFrom || uploadedTo) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUploadedFrom("");
+                      setUploadedTo("");
+                    }}
+                    className="text-[11px] font-bold text-rose-600 hover:underline cursor-pointer"
+                  >
+                    {t("Clear")}
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="date"
+                  value={uploadedFrom}
+                  max={uploadedTo || undefined}
+                  onChange={(e) => setUploadedFrom(e.target.value)}
+                  aria-label="Uploaded from date"
+                  className="h-9 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2.5 text-xs font-medium text-gray-800 dark:text-gray-100 focus:border-[#B88E2F] focus:outline-none"
+                />
+                <input
+                  type="date"
+                  value={uploadedTo}
+                  min={uploadedFrom || undefined}
+                  onChange={(e) => setUploadedTo(e.target.value)}
+                  aria-label="Uploaded to date"
+                  className="h-9 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2.5 text-xs font-medium text-gray-800 dark:text-gray-100 focus:border-[#B88E2F] focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Archived Time Range (enabled only when Archive status is selected) */}
+            <div
+              className={`rounded-xl border p-3 space-y-2 transition ${
+                isArchiveDateEnabled
+                  ? "border-amber-300/80 dark:border-amber-500/40 bg-amber-50/40 dark:bg-amber-500/10"
+                  : "border-gray-200/70 dark:border-gray-800 bg-gray-100/60 dark:bg-gray-800/30 opacity-60"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1.5 text-xs font-extrabold text-gray-700 dark:text-gray-200">
+                  <Archive size={13} className="text-amber-600" />
+                  {t("Archived Time")}
+                </span>
+                {isArchiveDateEnabled ? (
+                  (archivedFrom || archivedTo) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setArchivedFrom("");
+                        setArchivedTo("");
+                      }}
+                      className="text-[11px] font-bold text-rose-600 hover:underline cursor-pointer"
+                    >
+                      {t("Clear")}
+                    </button>
+                  )
+                ) : (
+                  <span className="text-[10px] font-bold text-gray-400">
+                    {t("Select Archive status")}
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="date"
+                  disabled={!isArchiveDateEnabled}
+                  value={archivedFrom}
+                  max={archivedTo || undefined}
+                  onChange={(e) => setArchivedFrom(e.target.value)}
+                  aria-label="Archived from date"
+                  className="h-9 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2.5 text-xs font-medium text-gray-800 dark:text-gray-100 focus:border-amber-500 focus:outline-none disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                />
+                <input
+                  type="date"
+                  disabled={!isArchiveDateEnabled}
+                  value={archivedTo}
+                  min={archivedFrom || undefined}
+                  onChange={(e) => setArchivedTo(e.target.value)}
+                  aria-label="Archived to date"
+                  className="h-9 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2.5 text-xs font-medium text-gray-800 dark:text-gray-100 focus:border-amber-500 focus:outline-none disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                />
+              </div>
+            </div>
+
+            {/* Recycled Time Range (enabled only when Recycle status is selected) */}
+            <div
+              className={`rounded-xl border p-3 space-y-2 transition ${
+                isRecycleDateEnabled
+                  ? "border-rose-300/80 dark:border-rose-500/40 bg-rose-50/40 dark:bg-rose-500/10"
+                  : "border-gray-200/70 dark:border-gray-800 bg-gray-100/60 dark:bg-gray-800/30 opacity-60"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1.5 text-xs font-extrabold text-gray-700 dark:text-gray-200">
+                  <Trash2 size={13} className="text-rose-600" />
+                  {t("Recycled Time")}
+                </span>
+                {isRecycleDateEnabled ? (
+                  (recycledFrom || recycledTo) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRecycledFrom("");
+                        setRecycledTo("");
+                      }}
+                      className="text-[11px] font-bold text-rose-600 hover:underline cursor-pointer"
+                    >
+                      {t("Clear")}
+                    </button>
+                  )
+                ) : (
+                  <span className="text-[10px] font-bold text-gray-400">
+                    {t("Select Recycle status")}
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="date"
+                  disabled={!isRecycleDateEnabled}
+                  value={recycledFrom}
+                  max={recycledTo || undefined}
+                  onChange={(e) => setRecycledFrom(e.target.value)}
+                  aria-label="Recycled from date"
+                  className="h-9 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2.5 text-xs font-medium text-gray-800 dark:text-gray-100 focus:border-rose-500 focus:outline-none disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                />
+                <input
+                  type="date"
+                  disabled={!isRecycleDateEnabled}
+                  value={recycledTo}
+                  min={recycledFrom || undefined}
+                  onChange={(e) => setRecycledTo(e.target.value)}
+                  aria-label="Recycled to date"
+                  className="h-9 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2.5 text-xs font-medium text-gray-800 dark:text-gray-100 focus:border-rose-500 focus:outline-none disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Active Selection Banner */}
+          {(selectedDeptObj ||
+            selectedStaffObj ||
+            timeHorizon !== "all" ||
+            documentStatus !== "all" ||
+            hasDateRangeFilter) && (
             <div className="flex flex-wrap items-center gap-2 rounded-xl bg-amber-50/70 dark:bg-amber-500/10 border border-amber-200/70 px-4 py-2.5 text-sm">
               <span className="font-bold text-gray-700 dark:text-gray-200">
                 {t("Currently Viewing")}:
               </span>
+              {documentStatus !== "all" && (
+                <span className="inline-flex items-center gap-1.5 rounded-lg bg-white dark:bg-gray-800 px-3 py-1 font-bold text-[#B88E2F] shadow-2xs capitalize">
+                  {documentStatus === "normal"
+                    ? t("Normal")
+                    : documentStatus === "archive"
+                    ? t("Archive")
+                    : t("Recycle")}
+                </span>
+              )}
               {timeHorizon !== "all" && (
                 <span className="inline-flex items-center gap-1.5 rounded-lg bg-white dark:bg-gray-800 px-3 py-1 font-bold text-[#B88E2F] shadow-2xs">
                   {timeHorizon === "daily"
@@ -1098,6 +1486,21 @@ export default function DashboardDocumentsTab() {
                     : timeHorizon === "weekly"
                     ? t("This Week")
                     : t("This Month")}
+                </span>
+              )}
+              {(uploadedFrom || uploadedTo) && (
+                <span className="inline-flex items-center gap-1.5 rounded-lg bg-white dark:bg-gray-800 px-3 py-1 text-xs font-bold text-teal-700 dark:text-teal-300 shadow-2xs">
+                  {t("Uploaded")}: {uploadedFrom || "..."} → {uploadedTo || "..."}
+                </span>
+              )}
+              {isArchiveDateEnabled && (archivedFrom || archivedTo) && (
+                <span className="inline-flex items-center gap-1.5 rounded-lg bg-white dark:bg-gray-800 px-3 py-1 text-xs font-bold text-amber-700 dark:text-amber-300 shadow-2xs">
+                  {t("Archived")}: {archivedFrom || "..."} → {archivedTo || "..."}
+                </span>
+              )}
+              {isRecycleDateEnabled && (recycledFrom || recycledTo) && (
+                <span className="inline-flex items-center gap-1.5 rounded-lg bg-white dark:bg-gray-800 px-3 py-1 text-xs font-bold text-rose-700 dark:text-rose-300 shadow-2xs">
+                  {t("Recycled")}: {recycledFrom || "..."} → {recycledTo || "..."}
                 </span>
               )}
               {selectedDeptObj && (
@@ -1222,6 +1625,7 @@ export default function DashboardDocumentsTab() {
                 {paginatedDocs.map((doc) => {
                   const fileMeta = getFileIconMeta(doc, 22);
                   const isTemp = (doc.dtype?.dtype_name || "").toLowerCase().includes("temp");
+                  const docStatus = getDocumentStatus(doc);
 
                   return (
                     <tr
@@ -1244,7 +1648,7 @@ export default function DashboardDocumentsTab() {
                             >
                               {doc.document_name}
                             </p>
-                            <div className="mt-1 flex items-center gap-2">
+                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
                               <span className="font-mono text-xs font-bold text-[#B88E2F]">
                                 {doc.document_id}
                               </span>
@@ -1256,6 +1660,21 @@ export default function DashboardDocumentsTab() {
                                 }`}
                               >
                                 {isTemp ? t("Temporary") : t("Permanent")}
+                              </span>
+                              <span
+                                className={`rounded-md px-2 py-0.5 text-[11px] font-bold ${
+                                  docStatus === "recycle"
+                                    ? "bg-rose-50 text-rose-700 border border-rose-200/70 dark:bg-rose-500/10 dark:text-rose-300"
+                                    : docStatus === "archive"
+                                    ? "bg-amber-50 text-amber-800 border border-amber-200/70 dark:bg-amber-500/10 dark:text-amber-300"
+                                    : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                                }`}
+                              >
+                                {docStatus === "recycle"
+                                  ? t("Recycled")
+                                  : docStatus === "archive"
+                                  ? t("Archived")
+                                  : t("Normal")}
                               </span>
                             </div>
                           </div>
@@ -1290,9 +1709,21 @@ export default function DashboardDocumentsTab() {
 
                       {/* Date */}
                       <td className="px-5 py-4 whitespace-nowrap">
-                        <span className="text-sm font-semibold text-gray-600 dark:text-gray-300">
-                          {fmtDate(doc.created_at || doc.updated_at)}
-                        </span>
+                        <div className="space-y-0.5">
+                          <span className="block text-sm font-semibold text-gray-600 dark:text-gray-300">
+                            {fmtDate(doc.created_at || doc.updated_at)}
+                          </span>
+                          {docStatus === "archive" && doc.archived_at && (
+                            <span className="block text-[11px] font-semibold text-amber-700 dark:text-amber-400">
+                              {t("Archived")}: {fmtDate(doc.archived_at)}
+                            </span>
+                          )}
+                          {docStatus === "recycle" && doc.recycled_at && (
+                            <span className="block text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+                              {t("Recycled")}: {fmtDate(doc.recycled_at)}
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Clear, Large Action Buttons */}
@@ -1667,6 +2098,32 @@ export default function DashboardDocumentsTab() {
                           {inspectedDoc.dtype?.dtype_name || t("Permanent")}
                         </p>
                       </div>
+                      <div>
+                        <p className="text-xs font-bold text-gray-400">{t("Document Status")}</p>
+                        <p className="mt-1 text-sm font-bold text-gray-800 dark:text-gray-200">
+                          {getDocumentStatus(inspectedDoc) === "recycle"
+                            ? t("Recycled")
+                            : getDocumentStatus(inspectedDoc) === "archive"
+                            ? t("Archived")
+                            : t("Normal")}
+                        </p>
+                      </div>
+                      {inspectedDoc.archived_at && (
+                        <div>
+                          <p className="text-xs font-bold text-amber-600">{t("Archived Date")}</p>
+                          <p className="mt-1 text-sm font-bold text-amber-700 dark:text-amber-300">
+                            {fmtDate(inspectedDoc.archived_at)}
+                          </p>
+                        </div>
+                      )}
+                      {inspectedDoc.recycled_at && (
+                        <div>
+                          <p className="text-xs font-bold text-rose-600">{t("Recycled Date")}</p>
+                          <p className="mt-1 text-sm font-bold text-rose-700 dark:text-rose-300">
+                            {fmtDate(inspectedDoc.recycled_at)}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

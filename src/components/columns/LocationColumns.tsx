@@ -1,8 +1,52 @@
+import { useState } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { Location } from "../../interfaces/location";
-import { MoreHorizontal } from "lucide-react";
+import { MapPin, MoreHorizontal } from "lucide-react";
 import { API_SERVER } from "../../helpers/api";
 import { helper } from "../../helpers/utils";
+
+const resolveMediaUrl = (path: string): string => {
+  if (!path) return "";
+  if (path.startsWith("http://") || path.startsWith("https://")) return path;
+  return `${API_SERVER}${path.startsWith("/") ? "" : "/"}${path}`;
+};
+
+function LocationThumbnail({
+  primaryPhoto,
+  totalPhotos,
+  alt,
+}: {
+  primaryPhoto?: string;
+  totalPhotos: number;
+  alt: string;
+}) {
+  const [imgError, setImgError] = useState(false);
+  const photoUrl = primaryPhoto ? resolveMediaUrl(primaryPhoto) : "";
+
+  if (!photoUrl || imgError) {
+    return (
+      <div className="w-10 h-10 rounded-lg bg-amber-50/80 flex items-center justify-center border border-amber-200/70 text-[#B88E2F] shrink-0">
+        <MapPin size={16} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative inline-block shrink-0">
+      <img
+        src={photoUrl}
+        alt={alt}
+        onError={() => setImgError(true)}
+        className="w-10 h-10 rounded-lg object-cover border border-gray-200 bg-gray-50"
+      />
+      {totalPhotos > 1 && (
+        <span className="absolute -top-1.5 -right-1.5 px-1.5 py-0.5 rounded-full bg-[#B88E2F] text-white text-[10px] font-bold leading-none shadow-xs">
+          {totalPhotos}
+        </span>
+      )}
+    </div>
+  );
+}
 
 const parseDateLocal = (dateStr: string): Date => {
   const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr.trim());
@@ -34,15 +78,17 @@ const timeAgo = (dateStr?: string | null) => {
 
 export const LocationColumns = (
   onOpenMenu: (doc: Location, e: React.MouseEvent<HTMLButtonElement>) => void,
-  options?: { mode?: "active" | "recycle" }
+  options?: { mode?: "active" | "recycle"; offset?: number }
 ): ColumnDef<Location>[] => {
   const isRecycle = options?.mode === "recycle";
+  const offset = options?.offset ?? 0;
 
   return [
   {
     id: "select",
+    enableSorting: false,
     header: ({ table }) => (
-      <div className="flex justify-center items-center">
+      <div className="flex justify-center items-center" onClick={(e) => e.stopPropagation()}>
         <input
           type="checkbox"
           checked={table.getIsAllPageRowsSelected()}
@@ -53,7 +99,7 @@ export const LocationColumns = (
       </div>
     ),
     cell: ({ row }) => (
-      <div className="flex justify-center items-center">
+      <div className="flex justify-center items-center" onClick={(e) => e.stopPropagation()}>
         <input
           type="checkbox"
           checked={row.getIsSelected()}
@@ -69,13 +115,17 @@ export const LocationColumns = (
   {
     id: "sl",
     header: "SL",
+    enableSorting: false,
     enableGlobalFilter: false,
-    cell: ({ row }) => <span className="text-sm font-semibold text-gray-700">{row.index + 1}</span>,
+    cell: ({ row }) => (
+      <span className="text-sm font-semibold text-gray-500">{offset + row.index + 1}</span>
+    ),
     size: 50,
   },
   {
     id: "icon",
-    header: "Icon",
+    header: "Photo",
+    enableSorting: false,
     enableGlobalFilter: false,
     cell: ({ row }) => {
       const photos: string[] = [];
@@ -89,53 +139,58 @@ export const LocationColumns = (
           }
         });
       }
-      const primaryPhoto = photos[0];
-      const photoUrl = primaryPhoto ? `${API_SERVER}${primaryPhoto}` : "";
-      return photoUrl ? (
-        <div className="relative inline-block">
-          <img
-            src={photoUrl}
-            alt="icon"
-            className="w-10 h-10 rounded-md object-cover border border-gray-200"
-          />
-          {photos.length > 1 && (
-            <span className="absolute -top-1.5 -right-1.5 px-1.5 py-0.2 rounded-full bg-[#B88E2F] text-white text-[10px] font-bold shadow-xs">
-              {photos.length}
-            </span>
-          )}
-        </div>
-      ) : (
-        <div className="w-10 h-10 rounded-md bg-gray-100 flex items-center justify-center border border-gray-200 text-xs text-gray-400">
-          N/A
-        </div>
+      return (
+        <LocationThumbnail
+          primaryPhoto={photos[0]}
+          totalPhotos={photos.length}
+          alt={row.original.location_name || "Location photo"}
+        />
       );
     },
     size: 80,
   },
   {
     accessorKey: "location_name",
-    header: "File Name",
+    header: "Location Name",
     enableGlobalFilter: true,
     cell: ({ row }) => (
-      <span className="text-sm text-gray-700 font-medium">
-        {row.original.location_name || "Unknown"}
-      </span>
+      <div className="max-w-[260px]">
+        <span
+          className="text-sm text-gray-800 font-semibold block truncate"
+          title={row.original.location_name || "Unknown"}
+        >
+          {row.original.location_name || "Unknown"}
+        </span>
+        {row.original.city && (
+          <span className="text-[11px] font-medium text-gray-400 block truncate">
+            {row.original.city}
+          </span>
+        )}
+      </div>
     ),
   },
   {
     id: "file_type",
-    header: "File Type",
+    header: "Type",
     accessorFn: (row) => {
+      if (row.location_type) return row.location_type;
       if (row.file_type) return row.file_type;
       const photoStr = typeof row.photo === "string" ? row.photo : "";
-      if (photoStr && typeof photoStr === 'string') {
+      if (photoStr && typeof photoStr === "string") {
         const parts = photoStr.split(".");
         if (parts.length > 1) return parts[parts.length - 1].toLowerCase();
       }
-      return "image";
+      return "—";
     },
     enableGlobalFilter: true,
-    cell: ({ getValue }) => <span className="text-sm text-gray-600">{getValue() as string}</span>,
+    cell: ({ getValue }) => {
+      const val = getValue() as string;
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-[#B88E2F] border border-amber-200/70 max-w-[160px] truncate">
+          {val}
+        </span>
+      );
+    },
   },
   {
     id: "department",
@@ -153,7 +208,11 @@ export const LocationColumns = (
       return "—";
     },
     enableGlobalFilter: true,
-    cell: ({ getValue }) => <span className="text-sm text-gray-600">{getValue() as string}</span>,
+    cell: ({ getValue }) => (
+      <span className="text-sm text-gray-600 max-w-[180px] truncate block">
+        {getValue() as string}
+      </span>
+    ),
   },
   {
     id: "uploaded",
@@ -181,13 +240,17 @@ export const LocationColumns = (
   {
     id: "actions",
     header: "",
+    enableSorting: false,
     enableGlobalFilter: false,
     size: 60,
     cell: ({ row }) => (
-      <div className="flex justify-end">
+      <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
-          onClick={(e) => onOpenMenu(row.original, e)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenMenu(row.original, e);
+          }}
           aria-label="Open actions"
           className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
         >

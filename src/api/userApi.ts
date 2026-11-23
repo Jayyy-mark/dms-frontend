@@ -21,7 +21,7 @@ export const userApi = {
 
         const response = await postApi("auth/register/", {
             username: form.username,
-            email: form.email,
+            email: form.email && form.email.trim() ? form.email.trim() : null,
             password1: form.password1,
             password2: form.password2,
             role: form.role,

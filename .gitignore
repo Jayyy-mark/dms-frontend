@@ -27,3 +27,5 @@ replace-gold.cjs
 
 moge-backend.tar
 moge-frontend.tar
+public/maps/
+*.pmtiles

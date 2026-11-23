@@ -9,7 +9,7 @@ import { staffApi } from "../../api/staffApi";
 import { useNavigate } from "react-router";
 import { toast } from "react-toastify";
 import { helper } from "../../helpers/utils";
-import Select from "../form/Select.tsx";
+import Select from "react-select";
 import { useSelectOptions } from "../../hooks/useSelectOptions.ts";
 import TextArea from "../form/input/TextArea.tsx";
 import { useFormErrors } from "../../hooks/useFormErrors.ts";
@@ -66,6 +66,38 @@ export default function AddStaffForm() {
         }));
     };
 
+    const selectStyles = {
+        control: (base: any, state: any) => ({
+            ...base,
+            borderRadius: "0.5rem",
+            minHeight: "44px",
+            borderColor: state.isFocused ? "#B88E2F" : "#d0d5dd",
+            boxShadow: state.isFocused ? "0 0 0 3px rgba(184, 142, 47, 0.15)" : "none",
+            fontSize: "0.875rem",
+            backgroundColor: "#ffffff",
+            "&:hover": {
+                borderColor: "#B88E2F",
+            },
+        }),
+        menuPortal: (base: any) => ({ ...base, zIndex: 9999 }),
+        menu: (base: any) => ({
+            ...base,
+            borderRadius: "0.75rem",
+            boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
+            border: "1px solid #e5e7eb",
+            overflow: "hidden",
+            zIndex: 9999,
+        }),
+        option: (base: any, state: any) => ({
+            ...base,
+            fontSize: "0.875rem",
+            backgroundColor: state.isSelected ? "#FEF3C7" : state.isFocused ? "#fffbe0" : "#ffffff",
+            color: state.isSelected ? "#B88E2F" : "#1e293b",
+            cursor: "pointer",
+            fontWeight: state.isSelected ? 600 : 400,
+        }),
+    };
+
     const handleSubmit = async () => {
         const valid = validate([
             { field: "staff_name", value: form.staff_name, label: "Staff name", required: true },
@@ -112,9 +144,14 @@ export default function AddStaffForm() {
                     <Label>Gender:</Label>
                     <Select
                         options={genderOptions}
-                        value={form.staff_gender}
-                        onChange={(v)=>handleChange("staff_gender",v)}
-                        className="dark:bg-dark-900"
+                        value={genderOptions.find((o) => String(o.value) === String(form.staff_gender)) ?? null}
+                        onChange={(option: any) => handleChange("staff_gender", option ? String(option.value) : "")}
+                        isSearchable
+                        isClearable
+                        placeholder="Select gender..."
+                        menuPortalTarget={typeof document !== "undefined" ? document.body : null}
+                        menuPosition="fixed"
+                        styles={selectStyles}
                     />
                     <FieldError message={errors.staff_gender} />
                 </div>
@@ -132,36 +169,56 @@ export default function AddStaffForm() {
                     <Label>Department:</Label>
                     <Select
                         options={departmentOptions}
-                        value={form.department_id}
-                        onChange={(v) => handleChange("department_id", v)}
-                        className="dark:bg-dark-900"
+                        value={departmentOptions.find((o) => String(o.value) === String(form.department_id)) ?? null}
+                        onChange={(option: any) => handleChange("department_id", option ? String(option.value) : "")}
+                        isSearchable
+                        isClearable
+                        placeholder="Select department..."
+                        menuPortalTarget={typeof document !== "undefined" ? document.body : null}
+                        menuPosition="fixed"
+                        styles={selectStyles}
                     />
                 </div> 
                 <div>
                     <Label>Role</Label>
                     <Select
                         options={roleOptions}
-                        value={form.role_id}
-                        onChange={(v) => handleChange("role_id", v)}
-                        className="dark:bg-dark-900"
+                        value={roleOptions.find((o) => String(o.value) === String(form.role_id)) ?? null}
+                        onChange={(option: any) => handleChange("role_id", option ? String(option.value) : "")}
+                        isSearchable
+                        isClearable
+                        placeholder="Select role..."
+                        menuPortalTarget={typeof document !== "undefined" ? document.body : null}
+                        menuPosition="fixed"
+                        styles={selectStyles}
                     />
                 </div>   
                 <div>
                     <Label>Rank:</Label>
                     <Select
                         options={rankOptions}
-                        value={form.rank_id}
-                        onChange={(v) => handleChange("rank_id", v)}
-                        className="dark:bg-dark-900"
+                        value={rankOptions.find((o) => String(o.value) === String(form.rank_id)) ?? null}
+                        onChange={(option: any) => handleChange("rank_id", option ? String(option.value) : "")}
+                        isSearchable
+                        isClearable
+                        placeholder="Select rank..."
+                        menuPortalTarget={typeof document !== "undefined" ? document.body : null}
+                        menuPosition="fixed"
+                        styles={selectStyles}
                     />
                 </div>
                 <div>
                     <Label>Staff type:</Label>
                     <Select
                         options={stypeOptions}
-                        value={form.stype_id}
-                        onChange={(v) => handleChange("stype_id", v)}
-                        className="dark:bg-dark-900"
+                        value={stypeOptions.find((o) => String(o.value) === String(form.stype_id)) ?? null}
+                        onChange={(option: any) => handleChange("stype_id", option ? String(option.value) : "")}
+                        isSearchable
+                        isClearable
+                        placeholder="Select staff type..."
+                        menuPortalTarget={typeof document !== "undefined" ? document.body : null}
+                        menuPosition="fixed"
+                        styles={selectStyles}
                     />
                 </div>   
                 <div className="md:col-span-3">

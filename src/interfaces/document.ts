@@ -18,6 +18,11 @@ export interface Document {
     updated_at?: string;
     expired_at?: string;
     description?: string;
+    is_archived?: boolean;
+    archived_at?: string | null;
+    is_recycled?: boolean;
+    recycled_at?: string | null;
+    restore_at?: string | null;
 }
 
 export interface DocumentApiResponse {

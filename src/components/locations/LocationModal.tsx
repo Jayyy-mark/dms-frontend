@@ -1,14 +1,20 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { X, MapPin, Navigation, Globe, Check, HardDrive } from "lucide-react";
+import { X, MapPin, Navigation, Globe, Check, Layers, HardDrive } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { leafletLayer, labelRules } from "protomaps-leaflet";
+import { namedFlavor } from "@protomaps/basemaps";
+import { PMTiles } from "pmtiles";
 import {
   reverseGeocodeOffline,
-  reverseGeocode,
   MyanmarLocationInfo,
 } from "../../helpers/myanmarGeocoding";
-import { resolveOfflineTile } from "../../helpers/offlineTileCoverage";
+
+// Ensure global L is defined for protomaps-leaflet in Vite ESM builds
+if (typeof window !== "undefined" && !(window as any).L) {
+  (window as any).L = L;
+}
 
 interface LocationModalProps {
   onClose: () => void;
@@ -22,33 +28,170 @@ interface LocationModalProps {
   initialLng?: string | number;
 }
 
-// Major Myanmar cities and key oil/gas operation regions for quick offline navigation
-const MYANMAR_CITIES = [
-  { name: "Yangon (ရန်ကုန်)", lat: 16.8409, lng: 96.1735, zoom: 12 },
-  { name: "Mandalay (မန္တလေး)", lat: 21.9588, lng: 96.0891, zoom: 12 },
-  { name: "Naypyidaw (နေပြည်တော်)", lat: 19.7633, lng: 96.0785, zoom: 12 },
-  { name: "Bago (ပဲခူး)", lat: 17.3221, lng: 96.4664, zoom: 12 },
-  { name: "Taungoo (တောင်ငူ)", lat: 18.9413, lng: 96.4344, zoom: 12 },
-  { name: "Magway (မကွေး)", lat: 20.1544, lng: 94.9455, zoom: 12 },
-  { name: "Chauk [Oil Field] (ချောက်)", lat: 20.8986, lng: 94.8219, zoom: 12 },
-  { name: "Yenangyaung [Oil Field] (ရေနံချောင်း)", lat: 20.4633, lng: 94.8778, zoom: 12 },
-  { name: "Taunggyi (တောင်ကြီး)", lat: 20.7888, lng: 97.0378, zoom: 12 },
-  { name: "Mawlamyine (မော်လမြိုင်)", lat: 16.4905, lng: 97.6283, zoom: 12 },
-  { name: "Pathein (ပုသိမ်)", lat: 16.7792, lng: 94.7324, zoom: 12 },
-  { name: "Monywa (မုံရွာ)", lat: 22.1086, lng: 95.1354, zoom: 12 },
-  { name: "Sittwe (စစ်တွေ)", lat: 20.1528, lng: 92.8683, zoom: 12 },
-  { name: "Myitkyina (မြစ်ကြီးနား)", lat: 25.3833, lng: 97.4000, zoom: 12 },
-  { name: "Dawei (ထားဝယ်)", lat: 14.0828, lng: 98.1942, zoom: 12 },
-  { name: "Pyay (ပြည်)", lat: 18.8242, lng: 95.2147, zoom: 12 },
+type OfflineMapMode = "streets_hd" | "satellite_hybrid" | "satellite" | "high_contrast" | "dark";
+type MapLabelLang = "en" | "my";
+
+interface MapModeOption {
+  id: OfflineMapMode;
+  label: string;
+  shortLabel: string;
+}
+
+const OFFLINE_VECTOR_PMTILES_URL = "/maps/myanmar.pmtiles";
+const OFFLINE_SATELLITE_PMTILES_URL = "/maps/myanmar-satellite.pmtiles";
+
+const MAP_MODES: MapModeOption[] = [
+  {
+    id: "streets_hd",
+    label: "Streets HD (Offline Vector)",
+    shortLabel: "Streets HD",
+  },
+  {
+    id: "satellite_hybrid",
+    label: "Satellite + Labels (Offline Sentinel-2)",
+    shortLabel: "Satellite",
+  },
+  {
+    id: "satellite",
+    label: "Satellite Clean (Offline Sentinel-2)",
+    shortLabel: "Sat Clean",
+  },
+  {
+    id: "high_contrast",
+    label: "High Contrast (Offline Vector)",
+    shortLabel: "Contrast",
+  },
+  {
+    id: "dark",
+    label: "Dark Mode (Offline Vector)",
+    shortLabel: "Dark",
+  },
 ];
 
-// Custom vector map pin icon (crisp SVG, completely offline, no external assets)
+// Major Myanmar cities and key oil/gas operation regions for quick offline navigation
+const MYANMAR_CITIES = [
+  { name: "Yangon (ရန်ကုန်)", lat: 16.8409, lng: 96.1735, zoom: 13 },
+  { name: "Mandalay (မန္တလေး)", lat: 21.9588, lng: 96.0891, zoom: 13 },
+  { name: "Naypyidaw (နေပြည်တော်)", lat: 19.7633, lng: 96.0785, zoom: 13 },
+  { name: "Bago (ပဲခူး)", lat: 17.3221, lng: 96.4664, zoom: 13 },
+  { name: "Taungoo (တောင်ငူ)", lat: 18.9413, lng: 96.4344, zoom: 13 },
+  { name: "Magway (မကွေး)", lat: 20.1544, lng: 94.9455, zoom: 13 },
+  { name: "Chauk [Oil Field] (ချောက်)", lat: 20.8986, lng: 94.8219, zoom: 13 },
+  { name: "Yenangyaung [Oil Field] (ရေနံချောင်း)", lat: 20.4633, lng: 94.8778, zoom: 13 },
+  { name: "Taunggyi (တောင်ကြီး)", lat: 20.7888, lng: 97.0378, zoom: 13 },
+  { name: "Mawlamyine (မော်လမြိုင်)", lat: 16.4905, lng: 97.6283, zoom: 13 },
+  { name: "Pathein (ပုသိမ်)", lat: 16.7792, lng: 94.7324, zoom: 13 },
+  { name: "Monywa (မုံရွာ)", lat: 22.1086, lng: 95.1354, zoom: 13 },
+  { name: "Sittwe (စစ်တွေ)", lat: 20.1528, lng: 92.8683, zoom: 13 },
+  { name: "Myitkyina (မြစ်ကြီးနား)", lat: 25.3833, lng: 97.4000, zoom: 13 },
+  { name: "Dawei (ထားဝယ်)", lat: 14.0828, lng: 98.1942, zoom: 13 },
+  { name: "Pyay (ပြည်)", lat: 18.8242, lng: 95.2147, zoom: 13 },
+];
+
+// Shared PMTiles reader for offline Sentinel-2 satellite imagery
+let satelliteArchiveSingleton: PMTiles | null = null;
+const getSatelliteArchive = () => {
+  if (!satelliteArchiveSingleton) {
+    satelliteArchiveSingleton = new PMTiles(OFFLINE_SATELLITE_PMTILES_URL);
+  }
+  return satelliteArchiveSingleton;
+};
+
+// Custom Leaflet GridLayer that reads JPG raster tiles directly from local myanmar-satellite.pmtiles
+// with seamless quadtree overzoom up to z=18 for areas where native data ends at z=11 or z=13.
+const createOfflineSatelliteLayer = (): L.GridLayer => {
+  const archive = getSatelliteArchive();
+
+  const PMTilesSatelliteLayer = L.GridLayer.extend({
+    createTile(coords: L.Coords, done: L.DoneCallback) {
+      const tile = document.createElement("div");
+      tile.className = "leaflet-tile";
+      tile.style.width = "256px";
+      tile.style.height = "256px";
+      tile.style.overflow = "hidden";
+      tile.style.backgroundColor = "#0f172a";
+
+      const img = document.createElement("img");
+      img.alt = "";
+      img.setAttribute("role", "presentation");
+      img.draggable = false;
+      img.style.position = "absolute";
+      img.style.maxWidth = "none";
+      img.style.maxHeight = "none";
+      img.style.display = "block";
+      img.style.pointerEvents = "none";
+      img.style.userSelect = "none";
+      tile.appendChild(img);
+
+      let finished = false;
+      const finish = () => {
+        if (!finished) {
+          finished = true;
+          done(undefined, tile);
+        }
+      };
+
+      const loadBestTile = async () => {
+        const startZ = Math.min(coords.z, 13);
+        for (let candZ = startZ; candZ >= 4; candZ--) {
+          const scale = 1 << (coords.z - candZ);
+          const candX = Math.floor(coords.x / scale);
+          const candY = Math.floor(coords.y / scale);
+          try {
+            const res = await archive.getZxy(candZ, candX, candY);
+            if (res && res.data && res.data.byteLength > 0) {
+              const subX = coords.x - candX * scale;
+              const subY = coords.y - candY * scale;
+              img.style.left = `${-subX * 256}px`;
+              img.style.top = `${-subY * 256}px`;
+              img.style.width = `${256 * scale}px`;
+              img.style.height = `${256 * scale}px`;
+
+              const blob = new Blob([res.data], { type: "image/jpeg" });
+              const objUrl = URL.createObjectURL(blob);
+              img.onload = () => {
+                URL.revokeObjectURL(objUrl);
+                finish();
+              };
+              img.onerror = () => {
+                URL.revokeObjectURL(objUrl);
+                finish();
+              };
+              img.src = objUrl;
+              return;
+            }
+          } catch {
+            // Try parent zoom level
+          }
+        }
+        finish();
+      };
+
+      void loadBestTile();
+      return tile;
+    },
+  });
+
+  return new (PMTilesSatelliteLayer as any)({
+    minZoom: 5,
+    maxZoom: 18,
+    tileSize: 256,
+    keepBuffer: 4,
+    updateWhenIdle: false,
+    attribution: "Sentinel-2 Cloudless 2024 by EOX (CC BY 4.0) • Offline",
+  });
+};
+
+// Custom vector map pin icon:
+// Leaflet's iconAnchor: [17, 42] shifts the 34x42 container by (-17px, -42px)
+// so that the bottom tip (17, 42) sits on the exact clicked GPS coordinate.
 const createCustomPin = () => {
   return L.divIcon({
     className: "moge-map-pin",
     html: `
-      <div style="position: relative; width: 34px; height: 42px; transform: translate(-17px, -42px);">
-        <svg viewBox="0 0 34 42" width="34" height="42" style="filter: drop-shadow(0 4px 6px rgba(0,0,0,0.35));">
+      <div style="position: relative; width: 34px; height: 42px; margin: 0; padding: 0; pointer-events: auto;">
+        <span style="position: absolute; left: 17px; top: 42px; width: 10px; height: 10px; margin-left: -5px; margin-top: -5px; border-radius: 9999px; background: rgba(37, 99, 235, 0.35); border: 1.5px solid #ffffff; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);"></span>
+        <svg viewBox="0 0 34 42" width="34" height="42" style="display: block; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.35));">
           <defs>
             <linearGradient id="pinGrad" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stop-color="#2563EB" />
@@ -66,19 +209,6 @@ const createCustomPin = () => {
   });
 };
 
-// SVG fallback tile if an uncached coordinate is requested (in-memory data URI, zero network request)
-const OFFLINE_FALLBACK_TILE =
-  "data:image/svg+xml;utf8," +
-  encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256">
-      <rect width="256" height="256" fill="#F8FAFC"/>
-      <path d="M0 0h256v256H0z" fill="none" stroke="#E2E8F0" stroke-width="1"/>
-      <line x1="0" y1="0" x2="256" y2="256" stroke="#F1F5F9" stroke-width="1"/>
-      <circle cx="128" cy="128" r="4" fill="#CBD5E1"/>
-      <text x="128" y="145" text-anchor="middle" fill="#94A3B8" font-size="10" font-family="system-ui, sans-serif">MOGE Offline Map</text>
-    </svg>`
-  );
-
 export default function LocationModal({
   onClose,
   onSelect,
@@ -89,6 +219,10 @@ export default function LocationModal({
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
+  const activeLayersRef = useRef<L.Layer[]>([]);
+
+  const [mapMode, setMapMode] = useState<OfflineMapMode>("streets_hd");
+  const [labelLang, setLabelLang] = useState<MapLabelLang>("en");
 
   // Coordinate parsing helper
   const parseCoord = (val: string | number | undefined, fallback: number): number => {
@@ -111,30 +245,13 @@ export default function LocationModal({
     return null;
   });
 
-  // Automatically geocode coordinates whenever marker changes
+  // 100% offline reverse geocoding whenever marker changes (zero external network calls)
   useEffect(() => {
     if (!markerPos) {
       setDetectedLocation(null);
       return;
     }
-
-    // 1. Instant 100% offline lookup
-    const offlineInfo = reverseGeocodeOffline(markerPos.lat, markerPos.lng);
-    setDetectedLocation(offlineInfo);
-
-    // 2. Non-blocking enhancement if online
-    let cancelled = false;
-    reverseGeocode(markerPos.lat, markerPos.lng)
-      .then((res) => {
-        if (!cancelled && res) {
-          setDetectedLocation(res);
-        }
-      })
-      .catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
+    setDetectedLocation(reverseGeocodeOffline(markerPos.lat, markerPos.lng));
   }, [markerPos?.lat, markerPos?.lng]);
 
   // Manual inputs for direct typing/pasting
@@ -177,137 +294,115 @@ export default function LocationModal({
     }
   }, []);
 
-  // Initialize Leaflet map (100% OFFLINE ONLY)
+  // Build layers for the selected 100% offline mode
+  const buildLayersForMode = useCallback(
+    (mode: OfflineMapMode, lang: MapLabelLang): L.Layer[] => {
+      if (typeof window !== "undefined") {
+        (window as any).L = L;
+      }
+
+      if (mode === "satellite") {
+        return [createOfflineSatelliteLayer()];
+      }
+
+      if (mode === "satellite_hybrid") {
+        const satLayer = createOfflineSatelliteLayer();
+        const darkFlavor = namedFlavor("dark");
+        const labelsOverlay = leafletLayer({
+          url: OFFLINE_VECTOR_PMTILES_URL,
+          paintRules: [],
+          labelRules: labelRules(darkFlavor, lang),
+          backgroundColor: "transparent",
+          maxDataZoom: 15,
+          minZoom: 5,
+          maxZoom: 18,
+          attribution: "© OpenStreetMap",
+        }) as unknown as L.Layer;
+        return [satLayer, labelsOverlay];
+      }
+
+      const flavor =
+        mode === "high_contrast" ? "white" : mode === "dark" ? "dark" : "light";
+      const vectorLayer = leafletLayer({
+        url: OFFLINE_VECTOR_PMTILES_URL,
+        flavor,
+        lang,
+        maxDataZoom: 15,
+        minZoom: 5,
+        maxZoom: 20,
+        attribution: "MOGE Offline Streets HD • © OpenStreetMap",
+      }) as unknown as L.Layer;
+      return [vectorLayer];
+    },
+    []
+  );
+
+  // Initialize Leaflet map (100% offline)
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
 
     const startLat = markerPos?.lat ?? 16.8409;
     const startLng = markerPos?.lng ?? 96.1735;
-    const startZoom = markerPos ? 13 : 11;
+    const startZoom = markerPos ? 14 : 12;
 
-    // Constrain map to Myanmar territory bounds so it never wanders off
     const map = L.map(mapContainerRef.current, {
       center: [startLat, startLng],
       zoom: startZoom,
       minZoom: 5,
-      maxZoom: 18,
+      maxZoom: 20,
       zoomControl: true,
       maxBounds: [
-        [8.5, 91.0],   // Southwest corner of Myanmar region
-        [29.0, 102.5], // Northeast corner of Myanmar region
+        [9.0, 91.5],   // Southwest corner of Myanmar
+        [28.8, 101.8], // Northeast corner of Myanmar
       ],
       maxBoundsViscosity: 0.9,
     });
 
     mapInstanceRef.current = map;
 
-    // Pure 100% offline quadtree tile layer:
-    // Loads directly from "/tiles/{z}/{x}/{y}.jpg" when available at zoom z,
-    // and seamlessly crops/scales the highest-resolution available local ancestor tile
-    // when zooming deeper (up to z=18) on any region across Myanmar.
-    const OfflineQuadtreeTileLayer = L.GridLayer.extend({
-      createTile(coords: L.Coords, done: L.DoneCallback) {
-        const tile = document.createElement("div");
-        tile.className = "leaflet-tile";
-        tile.style.width = "256px";
-        tile.style.height = "256px";
-        tile.style.overflow = "hidden";
-
-        const img = document.createElement("img");
-        img.alt = "";
-        img.setAttribute("role", "presentation");
-        img.draggable = false;
-        img.style.position = "absolute";
-        img.style.maxWidth = "none";
-        img.style.maxHeight = "none";
-        img.style.display = "block";
-        img.style.pointerEvents = "none";
-        img.style.userSelect = "none";
-
-        tile.appendChild(img);
-
-        let finished = false;
-        const finish = () => {
-          if (!finished) {
-            finished = true;
-            done(undefined, tile);
-          }
-        };
-
-        const applyTileAttempt = (maxStartZ: number) => {
-          const resolved = resolveOfflineTile(coords.z, coords.x, coords.y, maxStartZ);
-          if (!resolved) {
-            img.onload = finish;
-            img.onerror = finish;
-            img.style.left = "0px";
-            img.style.top = "0px";
-            img.style.width = "256px";
-            img.style.height = "256px";
-            img.src = OFFLINE_FALLBACK_TILE;
-            return;
-          }
-
-          const { z, x, y, scale, subX, subY } = resolved;
-          img.style.left = `${-subX * 256}px`;
-          img.style.top = `${-subY * 256}px`;
-          img.style.width = `${256 * scale}px`;
-          img.style.height = `${256 * scale}px`;
-
-          img.onload = finish;
-          img.onerror = () => {
-            if (z > 4) {
-              applyTileAttempt(z - 1);
-            } else {
-              img.onerror = finish;
-              img.style.left = "0px";
-              img.style.top = "0px";
-              img.style.width = "256px";
-              img.style.height = "256px";
-              img.src = OFFLINE_FALLBACK_TILE;
-            }
-          };
-
-          img.src = `/tiles/${z}/${x}/${y}.jpg`;
-        };
-
-        applyTileAttempt(13);
-        return tile;
-      },
-    });
-
-    const offlineTileLayer = new (OfflineQuadtreeTileLayer as any)({
-      minZoom: 5,
-      maxZoom: 18,
-      tileSize: 256,
-      keepBuffer: 4,
-      updateWhenIdle: false,
-      attribution: "MOGE Local Offline Map",
-    });
-
-    offlineTileLayer.addTo(map);
-
-    // If we have an initial position, place the marker
     if (markerPos) {
       updateMarker(markerPos.lat, markerPos.lng, false);
     }
 
-    // Map click handler: place or move pin
     map.on("click", (e: L.LeafletMouseEvent) => {
       updateMarker(e.latlng.lat, e.latlng.lng, false);
     });
 
-    // Ensure map container renders properly inside modal
-    const resizeTimer = setTimeout(() => {
-      map.invalidateSize();
-    }, 150);
+    const resizeTimer1 = setTimeout(() => map.invalidateSize(), 50);
+    const resizeTimer2 = setTimeout(() => map.invalidateSize(), 250);
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined" && mapContainerRef.current) {
+      resizeObserver = new ResizeObserver(() => {
+        map.invalidateSize();
+      });
+      resizeObserver.observe(mapContainerRef.current);
+    }
 
     return () => {
-      clearTimeout(resizeTimer);
+      clearTimeout(resizeTimer1);
+      clearTimeout(resizeTimer2);
+      resizeObserver?.disconnect();
       map.remove();
       mapInstanceRef.current = null;
       markerRef.current = null;
+      activeLayersRef.current = [];
     };
   }, []);
+
+  // Mount or switch offline layers when mode or label language changes
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    activeLayersRef.current.forEach((layer) => {
+      map.removeLayer(layer);
+    });
+
+    const nextLayers = buildLayersForMode(mapMode, labelLang);
+    nextLayers.forEach((layer) => layer.addTo(map));
+    activeLayersRef.current = nextLayers;
+  }, [mapMode, labelLang, buildLayersForMode]);
 
   // Handle manual coordinate apply
   const handleApplyManualCoords = () => {
@@ -333,13 +428,12 @@ export default function LocationModal({
     }
   };
 
-  // Format numbers to 6 decimal places
   const formatCoord = (value: number) => value.toFixed(6);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
       <div className="w-full max-w-4xl rounded-2xl bg-white shadow-2xl dark:bg-gray-900 overflow-hidden border border-gray-100 dark:border-gray-800 flex flex-col max-h-[92vh]">
-        
+
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/40">
           <div className="flex items-center gap-3">
@@ -362,8 +456,8 @@ export default function LocationModal({
           <div className="flex items-center gap-3">
             {/* 100% Offline Status Badge */}
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800">
-              <HardDrive size={13} className="text-emerald-600" />
-              <span>{t("Offline Map (Local Storage)") || "Offline Map (Local Storage)"}</span>
+              <HardDrive size={13} className="text-emerald-600 dark:text-emerald-400" />
+              <span>{t("Offline Streets HD & Sentinel-2") || "Offline Streets HD & Sentinel-2"}</span>
             </div>
 
             <button
@@ -378,7 +472,7 @@ export default function LocationModal({
 
         {/* Toolbar: City Jump & Manual Coordinates */}
         <div className="p-4 bg-gray-50/80 dark:bg-gray-800/60 border-b border-gray-100 dark:border-gray-800 flex flex-wrap items-center gap-3 text-xs">
-          
+
           {/* Quick Jump Selector */}
           <div className="flex items-center gap-2 flex-1 min-w-[240px]">
             <Globe size={15} className="text-gray-500 dark:text-gray-400 shrink-0" />
@@ -428,14 +522,45 @@ export default function LocationModal({
           </div>
         </div>
 
-        {/* Leaflet Map Viewport */}
+        {/* Leaflet Offline Map Viewport */}
         <div className="relative flex-1 min-h-[460px] w-full bg-slate-100 dark:bg-gray-950">
-          <div ref={mapContainerRef} className="w-full h-full" style={{ minHeight: "460px" }} />
-          
-          {/* Subtle guide badge over the map */}
-          <div className="absolute top-3 right-3 z-[1000] bg-white/90 dark:bg-gray-900/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-gray-200/80 dark:border-gray-700 shadow-sm text-[11px] text-gray-600 dark:text-gray-300 flex items-center gap-2 pointer-events-none">
-            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            <span>{t("Offline map loaded locally (No internet required)")}</span>
+          <div ref={mapContainerRef} className="w-full h-[460px] cursor-crosshair" />
+
+          {/* Offline Mode & Label Language Switcher */}
+          <div className="absolute top-3 right-3 z-[1000] flex flex-wrap items-center gap-1.5 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md p-1.5 rounded-xl border border-gray-200/80 dark:border-gray-700 shadow-md text-[11px]">
+            <Layers size={12} className="text-gray-400 ml-1" />
+            {MAP_MODES.map((mode) => {
+              const active = mapMode === mode.id;
+              return (
+                <button
+                  key={mode.id}
+                  type="button"
+                  onClick={() => setMapMode(mode.id)}
+                  className={`px-2.5 py-1 rounded-lg font-semibold transition ${
+                    active
+                      ? "bg-blue-600 text-white shadow-xs"
+                      : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  }`}
+                  title={mode.label}
+                >
+                  {mode.shortLabel}
+                </button>
+              );
+            })}
+
+            {mapMode !== "satellite" && (
+              <>
+                <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-0.5" />
+                <button
+                  type="button"
+                  onClick={() => setLabelLang((prev) => (prev === "en" ? "my" : "en"))}
+                  className="px-2 py-1 rounded-lg font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+                  title="Toggle Map Label Language (English / Myanmar)"
+                >
+                  {labelLang === "en" ? "EN" : "မြန်မာ"}
+                </button>
+              </>
+            )}
           </div>
         </div>
 

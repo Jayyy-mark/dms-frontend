@@ -1,143 +1,197 @@
-import { useState, useEffect, useMemo } from "react";
-import { Search, CheckCircle2, XCircle, RotateCcw, Layers } from "lucide-react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { Search, CheckCircle2, XCircle, RotateCcw, Layers, Shield, Save, Undo2 } from "lucide-react";
+import { toast } from "react-toastify";
 import PageMeta from "../../components/common/PageMeta";
-import { DEFAULT_MODULES, MODULE_CHANGE_EVENT, dispatchModuleChange } from "../../utils/moduleManager";
+import { DEFAULT_MODULES, dispatchModuleChange } from "../../utils/moduleManager";
 import { moduleApi } from "../../api/moduleApi";
+import { userRoleApi } from "../../api/userRoleApi";
+import { USER_ROLES_CHANGE_EVENT } from "../../utils/userRoleManager";
+import { useAuth } from "../../context/AuthContext";
 
-type CategoryFilter = "All" | "System" | "Documents" | "Departments" | "Users";
+type CategoryFilter = "All" | "HR" | "Documents" | "Departments" | "Users" | "System";
+
+interface RoleOption {
+  id: number;
+  name: string;
+}
 
 export default function ModulesControl() {
-  // Feature status from backend: featureKey → { dbId, status }
-  const [featureStatusMap, setFeatureStatusMap] = useState<
-    Record<string, { dbId: number; status: boolean }>
-  >({});
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+
+  // Available User Roles & currently selected role
+  const [roles, setRoles] = useState<RoleOption[]>([]);
+  const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
+
+  // Saved vs Draft module statuses for the currently selected role (featureKey -> boolean)
+  const [savedStatusMap, setSavedStatusMap] = useState<Record<string, boolean>>({});
+  const [draftStatusMap, setDraftStatusMap] = useState<Record<string, boolean>>({});
+
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [roleLoading, setRoleLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [activeCategory, setActiveCategory] = useState<CategoryFilter>("All");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Fetch modules with features from backend on mount
+  const selectedRole = useMemo(
+    () => roles.find((r) => r.id === selectedRoleId) || null,
+    [roles, selectedRoleId]
+  );
+
+  const isEditingCurrentUserRole = Boolean(
+    selectedRole &&
+      user?.role &&
+      selectedRole.name.trim().toLowerCase() === user.role.trim().toLowerCase()
+  );
+
+  const hasUnsavedChanges = useMemo(() => {
+    const keys = new Set([...Object.keys(savedStatusMap), ...Object.keys(draftStatusMap)]);
+    for (const key of keys) {
+      if ((savedStatusMap[key] ?? true) !== (draftStatusMap[key] ?? true)) {
+        return true;
+      }
+    }
+    return false;
+  }, [savedStatusMap, draftStatusMap]);
+
+  // Fetch roles list on mount and when roles change
+  const loadRoles = useCallback(async () => {
+    try {
+      const data = await userRoleApi.getRoles();
+      const fetchedRoles: RoleOption[] = Array.isArray(data?.roles) ? data.roles : [];
+      setRoles(fetchedRoles);
+      setSelectedRoleId((prev) => {
+        if (prev !== null && fetchedRoles.some((r) => r.id === prev)) {
+          return prev;
+        }
+        const ownRole = fetchedRoles.find(
+          (r) => user?.role && r.name.trim().toLowerCase() === user.role.trim().toLowerCase()
+        );
+        return ownRole?.id ?? fetchedRoles[0]?.id ?? null;
+      });
+    } catch (e) {
+      console.error("Failed to fetch user roles:", e);
+      toast.error("Failed to load user roles.");
+      setInitialLoading(false);
+    }
+  }, [user?.role]);
+
   useEffect(() => {
-    const fetchModules = async () => {
+    loadRoles();
+    window.addEventListener(USER_ROLES_CHANGE_EVENT, loadRoles);
+    return () => {
+      window.removeEventListener(USER_ROLES_CHANGE_EVENT, loadRoles);
+    };
+  }, [loadRoles]);
+
+  // Fetch role-specific module statuses whenever selectedRoleId changes
+  useEffect(() => {
+    if (selectedRoleId === null) return;
+    let cancelled = false;
+
+    const fetchRoleModules = async () => {
+      setRoleLoading(true);
       try {
-        const data = await moduleApi.getModules();
-        const map: Record<string, { dbId: number; status: boolean }> = {};
-        data.modules.forEach((m: any) => {
-          m.features.forEach((f: any) => {
-            map[f.name] = { dbId: f.id, status: f.status };
+        const data = await moduleApi.getRoleModules(selectedRoleId);
+        if (cancelled) return;
+        const map: Record<string, boolean> = {};
+        DEFAULT_MODULES.forEach((m) => {
+          map[m.id] = true;
+        });
+        if (data?.feature_status && typeof data.feature_status === "object") {
+          Object.entries(data.feature_status).forEach(([key, val]) => {
+            map[key] = Boolean(val);
           });
-        });
-        setFeatureStatusMap(map);
-      } catch (e) {
-        console.error("Failed to fetch modules from backend:", e);
-        // Fallback: all modules enabled
-        const fallback: Record<string, { dbId: number; status: boolean }> = {};
-        DEFAULT_MODULES.forEach((m, i) => {
-          fallback[m.id] = { dbId: i + 1, status: true };
-        });
-        setFeatureStatusMap(fallback);
+        } else {
+          (data?.modules || []).forEach((m: any) => {
+            (m.features || []).forEach((f: any) => {
+              map[f.name] = Boolean(f.status);
+            });
+          });
+        }
+        setSavedStatusMap(map);
+        setDraftStatusMap(map);
+      } catch (e: any) {
+        if (cancelled) return;
+        console.error("Failed to fetch modules for role:", e);
+        toast.error(
+          e?.response?.data?.message ||
+            "Failed to load role modules. Make sure the backend server is restarted."
+        );
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setRoleLoading(false);
+          setInitialLoading(false);
+        }
       }
     };
-    fetchModules();
-  }, []);
 
-  // Listen for external module change events
-  useEffect(() => {
-    const handleModuleChange = (e: CustomEvent<Record<string, boolean>>) => {
-      setFeatureStatusMap((prev) => {
-        const updated = { ...prev };
-        Object.entries(e.detail).forEach(([key, status]) => {
-          if (updated[key]) {
-            updated[key] = { ...updated[key], status };
-          }
-        });
-        return updated;
-      });
-    };
-
-    window.addEventListener(MODULE_CHANGE_EVENT as any, handleModuleChange as any);
+    fetchRoleModules();
     return () => {
-      window.removeEventListener(MODULE_CHANGE_EVENT as any, handleModuleChange as any);
+      cancelled = true;
     };
-  }, []);
+  }, [selectedRoleId]);
 
-  // Dispatch change event helper
-  const emitModuleChange = (updatedMap: Record<string, { dbId: number; status: boolean }>) => {
-    const statusMap: Record<string, boolean> = {};
-    Object.entries(updatedMap).forEach(([key, val]) => {
-      statusMap[key] = val.status;
-    });
-    dispatchModuleChange(statusMap);
-  };
-
-  const handleToggle = async (id: string) => {
-    const feature = featureStatusMap[id];
-    if (!feature) return;
-    const newStatus = !feature.status;
-
-    // Optimistic update
-    const updatedMap = {
-      ...featureStatusMap,
-      [id]: { ...feature, status: newStatus },
-    };
-    setFeatureStatusMap(updatedMap);
-    emitModuleChange(updatedMap);
-
-    try {
-      await moduleApi.toggleFeature(feature.dbId, newStatus);
-    } catch (e) {
-      console.error("Failed to toggle feature:", e);
-      // Revert on error
-      setFeatureStatusMap((prev) => ({
-        ...prev,
-        [id]: { ...prev[id], status: !newStatus },
-      }));
+  const handleSelectRole = (roleId: number) => {
+    if (roleId === selectedRoleId) return;
+    if (hasUnsavedChanges) {
+      const proceed = window.confirm(
+        `You have unsaved changes for "${selectedRole?.name || "this role"}". Discard them and switch roles?`
+      );
+      if (!proceed) return;
     }
+    setSelectedRoleId(roleId);
   };
 
-  const handleEnableAll = async () => {
-    const updated = { ...featureStatusMap };
-    Object.keys(updated).forEach((key) => {
-      updated[key] = { ...updated[key], status: true };
-    });
-    setFeatureStatusMap(updated);
-    emitModuleChange(updated);
-
-    try {
-      await moduleApi.bulkAction("enable_all");
-    } catch (e) {
-      console.error("Failed to enable all:", e);
-    }
+  // Toggle locally in draft state only (persisted when clicking Save Changes)
+  const handleToggle = (id: string) => {
+    if (selectedRoleId === null || roleLoading || isSaving) return;
+    setDraftStatusMap((prev) => ({
+      ...prev,
+      [id]: !(prev[id] ?? true),
+    }));
   };
 
-  const handleDisableAll = async () => {
-    const updated = { ...featureStatusMap };
-    Object.keys(updated).forEach((key) => {
-      updated[key] = { ...updated[key], status: false };
+  const handleDraftBulk = (targetStatus: boolean) => {
+    if (selectedRoleId === null || roleLoading || isSaving) return;
+    const next: Record<string, boolean> = {};
+    DEFAULT_MODULES.forEach((m) => {
+      next[m.id] = targetStatus;
     });
-    setFeatureStatusMap(updated);
-    emitModuleChange(updated);
-
-    try {
-      await moduleApi.bulkAction("disable_all");
-    } catch (e) {
-      console.error("Failed to disable all:", e);
-    }
+    Object.keys(draftStatusMap).forEach((key) => {
+      next[key] = targetStatus;
+    });
+    setDraftStatusMap(next);
   };
 
-  const handleReset = async () => {
-    const updated = { ...featureStatusMap };
-    Object.keys(updated).forEach((key) => {
-      updated[key] = { ...updated[key], status: true };
-    });
-    setFeatureStatusMap(updated);
-    emitModuleChange(updated);
+  const handleDiscardChanges = () => {
+    setDraftStatusMap({ ...savedStatusMap });
+  };
 
+  const handleSaveRoleModules = async () => {
+    if (selectedRoleId === null || isSaving) return;
+    setIsSaving(true);
     try {
-      await moduleApi.bulkAction("reset");
-    } catch (e) {
-      console.error("Failed to reset:", e);
+      const data = await moduleApi.saveRoleModules(selectedRoleId, draftStatusMap);
+      const persistedMap: Record<string, boolean> = { ...draftStatusMap };
+      if (data?.feature_status && typeof data.feature_status === "object") {
+        Object.entries(data.feature_status).forEach(([key, val]) => {
+          persistedMap[key] = Boolean(val);
+        });
+      }
+      setSavedStatusMap(persistedMap);
+      setDraftStatusMap(persistedMap);
+
+      // Only update the current user's live sidebar if they saved their own role
+      if (isEditingCurrentUserRole) {
+        dispatchModuleChange(persistedMap);
+      }
+
+      toast.success(`Saved module settings for "${selectedRole?.name || "role"}"!`);
+    } catch (e: any) {
+      console.error("Failed to save role modules:", e);
+      toast.error(e?.response?.data?.message || "Failed to save module settings.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -157,16 +211,16 @@ export default function ModulesControl() {
     });
   }, [activeCategory, searchQuery]);
 
-  // Statistics
+  // Statistics (reflect current draft for selected role)
   const totalCount = DEFAULT_MODULES.length;
   const enabledCount = useMemo(() => {
-    return DEFAULT_MODULES.filter((m) => featureStatusMap[m.id]?.status !== false).length;
-  }, [featureStatusMap]);
+    return DEFAULT_MODULES.filter((m) => draftStatusMap[m.id] !== false).length;
+  }, [draftStatusMap]);
   const disabledCount = totalCount - enabledCount;
 
-  const categories: CategoryFilter[] = ["All", "System", "Documents", "Departments", "Users"];
+  const categories: CategoryFilter[] = ["All", "HR", "Documents", "Departments", "Users", "System"];
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className="bg-[#fcfdff] min-h-screen pb-12 animate-pulse">
         <div className="px-4 sm:px-8 py-8 max-w-[1400px] mx-auto space-y-6">
@@ -215,10 +269,10 @@ export default function ModulesControl() {
 
   return (
     <div className="bg-[#fcfdff] min-h-screen pb-12 animate-in fade-in duration-300">
-      <PageMeta title="Modules Control | MOEE" description="Enable or disable application modules" />
+      <PageMeta title="Modules Control | MOGE" description="Enable or disable application modules per user role" />
 
       <div className="px-4 sm:px-8 py-8 max-w-[1400px] mx-auto space-y-6">
-        {/* Header - Room.tsx border level */}
+        {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-gray-200 shadow-sm">
           <div>
             <div className="flex items-center gap-2.5">
@@ -228,36 +282,134 @@ export default function ModulesControl() {
               <div>
                 <h1 className="text-xl font-bold text-[#0f172a] tracking-tight">Modules Management</h1>
                 <p className="text-xs font-medium text-gray-500 mt-0.5">
-                  Turn modules on or off to customize sidebar items and page access.
+                  Select a user role, toggle modules for that role, and click Save Changes.
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Quick Actions */}
+          {/* Quick Actions (modify local draft until Save Changes is clicked) */}
           <div className="flex flex-wrap items-center gap-2.5">
             <button
-              onClick={handleEnableAll}
-              className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 rounded-full transition shadow-sm"
+              type="button"
+              disabled={isSaving || roleLoading || selectedRoleId === null}
+              onClick={() => handleDraftBulk(true)}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 rounded-full transition shadow-sm disabled:opacity-50"
             >
               <CheckCircle2 size={15} /> Enable All
             </button>
             <button
-              onClick={handleDisableAll}
-              className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-100 rounded-full transition shadow-sm"
+              type="button"
+              disabled={isSaving || roleLoading || selectedRoleId === null}
+              onClick={() => handleDraftBulk(false)}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-100 rounded-full transition shadow-sm disabled:opacity-50"
             >
               <XCircle size={15} /> Disable All
             </button>
             <button
-              onClick={handleReset}
-              className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-gray-700 bg-gray-100 border border-gray-200 hover:bg-gray-200 rounded-full transition shadow-sm"
+              type="button"
+              disabled={isSaving || roleLoading || selectedRoleId === null}
+              onClick={() => handleDraftBulk(true)}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-gray-700 bg-gray-100 border border-gray-200 hover:bg-gray-200 rounded-full transition shadow-sm disabled:opacity-50"
             >
               <RotateCcw size={15} /> Reset Defaults
             </button>
           </div>
         </div>
 
-        {/* Stats Cards - Room.tsx border level */}
+        {/* User Role Selector + Save Bar */}
+        <div className="bg-white p-4 sm:p-5 rounded-3xl border border-gray-200 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-xl bg-amber-50 text-[#B88E2F] border border-amber-200/70">
+                <Shield size={16} />
+              </div>
+              <div>
+                <h2 className="text-xs font-extrabold text-[#0f172a] uppercase tracking-wider">
+                  Target User Role
+                </h2>
+                <p className="text-[11px] text-gray-500">
+                  Each role has independent module visibility. Changes are saved only for{" "}
+                  <span className="font-bold text-[#B88E2F]">
+                    {selectedRole?.name || "—"}
+                  </span>
+                  .
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {hasUnsavedChanges && (
+                <>
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                    Unsaved changes
+                  </span>
+                  <button
+                    type="button"
+                    disabled={isSaving}
+                    onClick={handleDiscardChanges}
+                    className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-full transition disabled:opacity-50"
+                  >
+                    <Undo2 size={14} /> Discard
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                disabled={!hasUnsavedChanges || isSaving || roleLoading || selectedRoleId === null}
+                onClick={handleSaveRoleModules}
+                className="flex items-center gap-1.5 px-5 py-2 text-xs font-bold text-white bg-[#B88E2F] hover:bg-[#997524] rounded-full transition shadow-sm disabled:opacity-45 disabled:cursor-not-allowed"
+              >
+                <Save size={14} />
+                {isSaving
+                  ? "Saving..."
+                  : `Save for ${selectedRole?.name || "Role"}`}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {roles.length === 0 ? (
+              <span className="text-xs text-gray-400">No user roles found.</span>
+            ) : (
+              roles.map((role) => {
+                const isSelected = role.id === selectedRoleId;
+                const isOwn =
+                  Boolean(user?.role) &&
+                  role.name.trim().toLowerCase() === user!.role.trim().toLowerCase();
+                return (
+                  <button
+                    key={role.id}
+                    type="button"
+                    onClick={() => handleSelectRole(role.id)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold transition-all border ${
+                      isSelected
+                        ? "bg-[#B88E2F] border-[#B88E2F] text-white shadow-sm"
+                        : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-amber-50/60 hover:border-amber-200"
+                    }`}
+                  >
+                    <Shield size={13} />
+                    <span>{role.name}</span>
+                    {isOwn && (
+                      <span
+                        className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                          isSelected
+                            ? "bg-white/20 text-white"
+                            : "bg-amber-100 text-[#B88E2F]"
+                        }`}
+                      >
+                        You
+                      </span>
+                    )}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           <div className="bg-white rounded-3xl p-5 border border-gray-200 shadow-sm flex items-center justify-between">
             <div>
@@ -290,7 +442,7 @@ export default function ModulesControl() {
           </div>
         </div>
 
-        {/* Filter Tabs & Search Bar - Room.tsx border level */}
+        {/* Filter Tabs & Search Bar */}
         <div className="bg-white p-4 rounded-3xl border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
           {/* Category Tabs */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 no-scrollbar">
@@ -304,6 +456,7 @@ export default function ModulesControl() {
               return (
                 <button
                   key={cat}
+                  type="button"
                   onClick={() => setActiveCategory(cat)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap border ${isActive
                     ? "bg-[#B88E2F] border-[#B88E2F] text-white shadow-sm"
@@ -335,8 +488,13 @@ export default function ModulesControl() {
           </div>
         </div>
 
-        {/* Modules Table - Room.tsx border level */}
+        {/* Modules Table */}
         <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden">
+          {roleLoading && (
+            <div className="h-0.5 w-full bg-[#B88E2F]/20 overflow-hidden">
+              <div className="h-full w-1/3 bg-[#B88E2F] animate-pulse" />
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
@@ -348,7 +506,7 @@ export default function ModulesControl() {
                   <th className="py-4 px-6 text-right">Toggle Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 text-xs font-medium">
+              <tbody className={`divide-y divide-gray-100 text-xs font-medium transition-opacity ${roleLoading ? "opacity-50 pointer-events-none" : ""}`}>
                 {filteredModules.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="text-center py-12 text-gray-400 font-medium">
@@ -357,10 +515,16 @@ export default function ModulesControl() {
                   </tr>
                 ) : (
                   filteredModules.map((mod) => {
-                    const isEnabled = featureStatusMap[mod.id]?.status !== false;
+                    const isEnabled = draftStatusMap[mod.id] !== false;
+                    const isChanged = (savedStatusMap[mod.id] ?? true) !== isEnabled;
 
                     return (
-                      <tr key={mod.id} className="hover:bg-[#FEF3C7]/30 transition-colors group">
+                      <tr
+                        key={mod.id}
+                        className={`hover:bg-[#FEF3C7]/30 transition-colors group ${
+                          isChanged ? "bg-amber-50/40" : ""
+                        }`}
+                      >
                         {/* Name & ID */}
                         <td className="py-4 px-6">
                           <div>
@@ -368,6 +532,11 @@ export default function ModulesControl() {
                               <span>{mod.name}</span>
                               {mod.myanmarName && (
                                 <span className="text-xs font-normal text-gray-500">({mod.myanmarName})</span>
+                              )}
+                              {isChanged && (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                                  Modified
+                                </span>
                               )}
                             </div>
                             <span className="text-[10px] font-mono font-medium text-gray-400 bg-gray-100 px-2 py-0.5 rounded-md inline-block mt-1">
@@ -385,7 +554,9 @@ export default function ModulesControl() {
                                 ? "bg-purple-50 text-purple-700"
                                 : mod.category === "Users"
                                   ? "bg-indigo-50 text-indigo-700"
-                                  : "bg-emerald-50 text-emerald-700"
+                                  : mod.category === "HR"
+                                    ? "bg-amber-50 text-amber-700"
+                                    : "bg-emerald-50 text-emerald-700"
                               }`}
                           >
                             {mod.category}
@@ -417,8 +588,9 @@ export default function ModulesControl() {
                         <td className="py-4 px-6 text-right">
                           <button
                             type="button"
+                            disabled={roleLoading || isSaving}
                             onClick={() => handleToggle(mod.id)}
-                            className={`relative inline-flex h-7 w-13 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isEnabled ? "bg-[#22C55E]" : "bg-gray-200"
+                            className={`relative inline-flex h-7 w-13 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 ${isEnabled ? "bg-[#22C55E]" : "bg-gray-200"
                               }`}
                           >
                             <span
