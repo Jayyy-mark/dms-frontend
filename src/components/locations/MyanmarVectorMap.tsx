@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
-import { Plus, Minus, Compass, MapPin, X, Layers } from "lucide-react";
+import { Plus, Minus, Compass, X, Layers } from "lucide-react";
 import { LocationMapPoint } from "../../interfaces/location";
 import { MYANMAR_REGIONS } from "./myanmarRegionsData";
 
@@ -351,11 +351,10 @@ export default function MyanmarVectorMap({
                     onSelectLocation(item.id);
                     setActiveCluster(null);
                   }}
-                  className={`w-full text-left px-3.5 py-2.5 flex items-start gap-2.5 transition ${
-                    isSelected
-                      ? "bg-amber-50/80 dark:bg-amber-500/10"
-                      : "hover:bg-gray-50 dark:hover:bg-gray-800/60"
-                  }`}
+                  className={`w-full text-left px-3.5 py-2.5 flex items-start gap-2.5 transition ${isSelected
+                    ? "bg-amber-50/80 dark:bg-amber-500/10"
+                    : "hover:bg-gray-50 dark:hover:bg-gray-800/60"
+                    }`}
                 >
                   <span
                     className="mt-1 h-2.5 w-2.5 rounded-full shrink-0 ring-2 ring-white dark:ring-gray-900"
@@ -406,11 +405,10 @@ export default function MyanmarVectorMap({
                     }}
                     onMouseMove={updateTooltipFromEvent}
                     onMouseLeave={() => setHoveredRegion(null)}
-                    className={`transition-colors duration-150 cursor-pointer ${
-                      isHovered
-                        ? "fill-[#A7D8CB] dark:fill-teal-800/60 stroke-[#0D9488] dark:stroke-teal-500"
-                        : "fill-[#C5E3DA] dark:fill-gray-800 hover:fill-[#B3DBC5] dark:hover:fill-teal-900/40 stroke-[#9EC9BD] dark:stroke-gray-700"
-                    }`}
+                    className={`transition-colors duration-150 cursor-pointer ${isHovered
+                      ? "fill-[#A7D8CB] dark:fill-teal-800/60 stroke-[#0D9488] dark:stroke-teal-500"
+                      : "fill-[#C5E3DA] dark:fill-gray-800 hover:fill-[#B3DBC5] dark:hover:fill-teal-900/40 stroke-[#9EC9BD] dark:stroke-gray-700"
+                      }`}
                     strokeWidth={isHovered ? 1.5 : 0.8}
                     strokeLinejoin="round"
                   />

@@ -1,8 +1,9 @@
 import { useTranslation } from "react-i18next";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import useSWR from "swr";
 import Select from "react-select";
+import flatpickr from "flatpickr";
 import {
   Archive,
   BarChart3,
@@ -179,6 +180,111 @@ function isWithinHorizon(dateStr: string | undefined, horizon: TimeHorizon): boo
   if (horizon === "weekly") return diffDays >= -1 && diffDays <= 7;
   if (horizon === "monthly") return diffDays >= -1 && diffDays <= 30;
   return true;
+}
+
+function formatYMD(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function DateRangeInput({
+  from,
+  to,
+  disabled,
+  placeholder,
+  accentClass,
+  onChange,
+}: {
+  from: string;
+  to: string;
+  disabled?: boolean;
+  placeholder: string;
+  accentClass?: string;
+  onChange: (nextFrom: string, nextTo: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const fpRef = useRef<flatpickr.Instance | null>(null);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+
+    const instance = flatpickr(el, {
+      mode: "range",
+      dateFormat: "d M Y",
+      allowInput: false,
+      clickOpens: !disabled,
+      appendTo: typeof document !== "undefined" ? document.body : undefined,
+      monthSelectorType: "static",
+      onChange: (selectedDates) => {
+        if (selectedDates.length === 0) {
+          onChangeRef.current("", "");
+        } else if (selectedDates.length === 1) {
+          const single = formatYMD(selectedDates[0]);
+          onChangeRef.current(single, "");
+        } else {
+          onChangeRef.current(formatYMD(selectedDates[0]), formatYMD(selectedDates[1]));
+        }
+      },
+    });
+    fpRef.current = instance;
+
+    return () => {
+      instance.destroy();
+      fpRef.current = null;
+    };
+  }, [disabled]);
+
+  // Keep flatpickr visual display synced when cleared/reset externally
+  useEffect(() => {
+    const fp = fpRef.current;
+    if (!fp) return;
+    if (!from && !to) {
+      if (fp.selectedDates.length > 0) {
+        fp.clear(false);
+      }
+      return;
+    }
+    const dates: Date[] = [];
+    if (from) {
+      const parsed = parseLocalDateBoundary(from, false);
+      if (parsed !== null) dates.push(new Date(parsed));
+    }
+    if (to) {
+      const parsed = parseLocalDateBoundary(to, false);
+      if (parsed !== null) dates.push(new Date(parsed));
+    }
+    const currentFrom = fp.selectedDates[0] ? formatYMD(fp.selectedDates[0]) : "";
+    const currentTo = fp.selectedDates[1] ? formatYMD(fp.selectedDates[1]) : "";
+    if (currentFrom !== from || currentTo !== to) {
+      fp.setDate(dates, false);
+    }
+  }, [from, to, disabled]);
+
+  return (
+    <div className="relative">
+      <input
+        ref={inputRef}
+        type="text"
+        readOnly
+        disabled={disabled}
+        placeholder={placeholder}
+        className={`h-9 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 pl-3 pr-9 text-xs font-semibold text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:outline-none transition cursor-pointer disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed ${
+          accentClass || "focus:border-[#B88E2F]"
+        }`}
+      />
+      <Calendar
+        size={14}
+        className={`pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 ${
+          disabled ? "text-gray-300 dark:text-gray-600" : "text-gray-400"
+        }`}
+      />
+    </div>
+  );
 }
 
 function getFileIconMeta(doc: Document, size = 20) {
@@ -1309,7 +1415,7 @@ export default function DashboardDocumentsTab() {
             })}
           </div>
 
-          {/* Row 3: Date Range Filters (Uploaded Time, Archived Time, Recycled Time) */}
+          {/* Row 3: Calendar Date Range Filters (Uploaded Time, Archived Time, Recycled Time) */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
             {/* Uploaded Time Range (always enabled) */}
             <div className="rounded-xl border border-gray-200/80 dark:border-gray-700 bg-gray-50/70 dark:bg-gray-800/50 p-3 space-y-2">
@@ -1331,24 +1437,16 @@ export default function DashboardDocumentsTab() {
                   </button>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="date"
-                  value={uploadedFrom}
-                  max={uploadedTo || undefined}
-                  onChange={(e) => setUploadedFrom(e.target.value)}
-                  aria-label="Uploaded from date"
-                  className="h-9 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2.5 text-xs font-medium text-gray-800 dark:text-gray-100 focus:border-[#B88E2F] focus:outline-none"
-                />
-                <input
-                  type="date"
-                  value={uploadedTo}
-                  min={uploadedFrom || undefined}
-                  onChange={(e) => setUploadedTo(e.target.value)}
-                  aria-label="Uploaded to date"
-                  className="h-9 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2.5 text-xs font-medium text-gray-800 dark:text-gray-100 focus:border-[#B88E2F] focus:outline-none"
-                />
-              </div>
+              <DateRangeInput
+                from={uploadedFrom}
+                to={uploadedTo}
+                placeholder={t("Select uploaded date range...")}
+                accentClass="focus:border-teal-500"
+                onChange={(nextFrom, nextTo) => {
+                  setUploadedFrom(nextFrom);
+                  setUploadedTo(nextTo);
+                }}
+              />
             </div>
 
             {/* Archived Time Range (enabled only when Archive status is selected) */}
@@ -1383,26 +1481,17 @@ export default function DashboardDocumentsTab() {
                   </span>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="date"
-                  disabled={!isArchiveDateEnabled}
-                  value={archivedFrom}
-                  max={archivedTo || undefined}
-                  onChange={(e) => setArchivedFrom(e.target.value)}
-                  aria-label="Archived from date"
-                  className="h-9 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2.5 text-xs font-medium text-gray-800 dark:text-gray-100 focus:border-amber-500 focus:outline-none disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
-                />
-                <input
-                  type="date"
-                  disabled={!isArchiveDateEnabled}
-                  value={archivedTo}
-                  min={archivedFrom || undefined}
-                  onChange={(e) => setArchivedTo(e.target.value)}
-                  aria-label="Archived to date"
-                  className="h-9 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2.5 text-xs font-medium text-gray-800 dark:text-gray-100 focus:border-amber-500 focus:outline-none disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
-                />
-              </div>
+              <DateRangeInput
+                from={archivedFrom}
+                to={archivedTo}
+                disabled={!isArchiveDateEnabled}
+                placeholder={t("Select archived date range...")}
+                accentClass="focus:border-amber-500"
+                onChange={(nextFrom, nextTo) => {
+                  setArchivedFrom(nextFrom);
+                  setArchivedTo(nextTo);
+                }}
+              />
             </div>
 
             {/* Recycled Time Range (enabled only when Recycle status is selected) */}
@@ -1437,26 +1526,17 @@ export default function DashboardDocumentsTab() {
                   </span>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="date"
-                  disabled={!isRecycleDateEnabled}
-                  value={recycledFrom}
-                  max={recycledTo || undefined}
-                  onChange={(e) => setRecycledFrom(e.target.value)}
-                  aria-label="Recycled from date"
-                  className="h-9 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2.5 text-xs font-medium text-gray-800 dark:text-gray-100 focus:border-rose-500 focus:outline-none disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
-                />
-                <input
-                  type="date"
-                  disabled={!isRecycleDateEnabled}
-                  value={recycledTo}
-                  min={recycledFrom || undefined}
-                  onChange={(e) => setRecycledTo(e.target.value)}
-                  aria-label="Recycled to date"
-                  className="h-9 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2.5 text-xs font-medium text-gray-800 dark:text-gray-100 focus:border-rose-500 focus:outline-none disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
-                />
-              </div>
+              <DateRangeInput
+                from={recycledFrom}
+                to={recycledTo}
+                disabled={!isRecycleDateEnabled}
+                placeholder={t("Select recycled date range...")}
+                accentClass="focus:border-rose-500"
+                onChange={(nextFrom, nextTo) => {
+                  setRecycledFrom(nextFrom);
+                  setRecycledTo(nextTo);
+                }}
+              />
             </div>
           </div>
 
